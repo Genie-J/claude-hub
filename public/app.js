@@ -234,6 +234,29 @@ function App() {
     return () => window.removeEventListener('resize', handler);
   }, []);
 
+  // Re-fit terminals after wake from sleep / tab becomes visible again
+  useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState === 'visible') {
+        // Delay to let the browser fully restore rendering
+        setTimeout(() => {
+          Object.values(terminalsRef.current).forEach(t => {
+            if (t.fitAddon) try { t.fitAddon.fit(); } catch (e) {}
+          });
+          // Also resync pty size for the active terminal
+          if (activeId && terminalsRef.current[activeId]) {
+            const { term, ws } = terminalsRef.current[activeId];
+            if (ws && ws.readyState === WebSocket.OPEN && term) {
+              ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+            }
+          }
+        }, 300);
+      }
+    };
+    document.addEventListener('visibilitychange', handler);
+    return () => document.removeEventListener('visibilitychange', handler);
+  }, [activeId]);
+
   // Fit + focus active terminal on tab change or sidebar toggle
   useEffect(() => {
     if (!activeId || !terminalsRef.current[activeId]) return;
