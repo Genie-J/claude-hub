@@ -39,7 +39,7 @@ html, body, #root {
   background: var(--bg-primary);
   color: var(--text-primary);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
-  font-size: 13px;
+  font-size: 16px;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -63,7 +63,7 @@ html, body, #root {
 
 .top-bar-title {
   font-weight: 700;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-secondary);
   white-space: nowrap;
   letter-spacing: -0.2px;
@@ -204,7 +204,7 @@ html, body, #root {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--text-muted);
   transition: color var(--transition);
@@ -296,7 +296,7 @@ html, body, #root {
 .sidebar-header {
   padding: 14px 16px 10px;
   font-weight: 600;
-  font-size: 11px;
+  font-size: 13px;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -343,7 +343,7 @@ html, body, #root {
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: 14px;
   outline: none;
   font-family: inherit;
   transition: border-color var(--transition);
@@ -361,7 +361,7 @@ html, body, #root {
   padding: 0 16px 10px;
   display: flex;
   gap: 12px;
-  font-size: 11px;
+  font-size: 13px;
   color: var(--text-muted);
 }
 
@@ -410,7 +410,7 @@ html, body, #root {
 }
 
 .sidebar-item-name {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -430,7 +430,7 @@ html, body, #root {
 }
 
 .sidebar-item-path {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -438,7 +438,7 @@ html, body, #root {
 }
 
 .sidebar-item-time {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--text-muted);
   white-space: nowrap;
   flex-shrink: 0;
@@ -1134,7 +1134,7 @@ html, body, #root {
   bottom: 8px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 11px;
+  font-size: 13px;
   color: var(--text-muted);
   opacity: 0.4;
   pointer-events: none;
