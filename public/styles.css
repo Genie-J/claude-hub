@@ -100,7 +100,6 @@ html, body, #root {
 
 .tab-bar {
   display: flex;
-  flex: 1;
   overflow-x: auto;
   gap: 1px;
   align-items: flex-end;
