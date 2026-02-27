@@ -238,30 +238,35 @@ function App() {
   useEffect(() => {
     const handler = () => {
       if (document.visibilityState === 'visible') {
-        // Delay to let the browser fully restore rendering, then refit + full redraw
-        const doRestore = () => {
-          Object.values(terminalsRef.current).forEach(t => {
-            if (t.fitAddon) try { t.fitAddon.fit(); } catch (e) {}
-            if (t.term) try {
-              t.term.refresh(0, t.term.rows - 1);
-              t.term.scrollToBottom();
+        setTimeout(() => {
+          Object.entries(terminalsRef.current).forEach(([id, t]) => {
+            if (!t.term || !t.fitAddon) return;
+            const { term, ws, fitAddon } = t;
+            try {
+              // Force a size change to trigger full re-layout in both
+              // xterm.js and the remote PTY application (SIGWINCH)
+              const origCols = term.cols;
+              term.resize(origCols - 1, term.rows);
+              if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'resize', cols: origCols - 1, rows: term.rows }));
+              }
+              // Restore correct size after a frame
+              requestAnimationFrame(() => {
+                try { fitAddon.fit(); } catch (e) {}
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                  ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+                }
+                term.refresh(0, term.rows - 1);
+                term.scrollToBottom();
+              });
             } catch (e) {}
           });
-          // Resync pty size for the active terminal
-          if (activeId && terminalsRef.current[activeId]) {
-            const { term, ws } = terminalsRef.current[activeId];
-            if (ws && ws.readyState === WebSocket.OPEN && term) {
-              ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
-            }
-          }
-        };
-        setTimeout(doRestore, 300);
-        setTimeout(doRestore, 800);
+        }, 500);
       }
     };
     document.addEventListener('visibilitychange', handler);
     return () => document.removeEventListener('visibilitychange', handler);
-  }, [activeId]);
+  }, []);
 
   // Fit + focus active terminal on tab change or sidebar toggle
   useEffect(() => {
