@@ -10,7 +10,7 @@ Browser-based UI for managing multiple Claude Code CLI sessions side by side.
 ## Setup
 
 ```bash
-git clone https://github.com/janetzhong/claude-hub.git
+git clone https://github.com/Genie-J/claude-hub.git
 cd claude-hub
 pnpm install    # or npm install
 pnpm start      # opens at http://localhost:3456
