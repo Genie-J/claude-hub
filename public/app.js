@@ -279,7 +279,7 @@ function App() {
     const term = new Terminal({
       cursorBlink: true,
       fontSize: 15,
-      fontFamily: "'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace",
+      fontFamily: "'Monaco', 'Menlo', 'SF Mono', 'Courier New', monospace",
       theme: termTheme,
       allowTransparency: false,
       scrollback: 10000,
