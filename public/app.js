@@ -278,7 +278,7 @@ function App() {
   function doAttach(sessionId, container) {
     const term = new Terminal({
       cursorBlink: true,
-      fontSize: 18,
+      fontSize: 15,
       fontFamily: "'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace",
       theme: termTheme,
       allowTransparency: false,
