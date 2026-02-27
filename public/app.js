@@ -238,19 +238,25 @@ function App() {
   useEffect(() => {
     const handler = () => {
       if (document.visibilityState === 'visible') {
-        // Delay to let the browser fully restore rendering
-        setTimeout(() => {
+        // Delay to let the browser fully restore rendering, then refit + full redraw
+        const doRestore = () => {
           Object.values(terminalsRef.current).forEach(t => {
             if (t.fitAddon) try { t.fitAddon.fit(); } catch (e) {}
+            if (t.term) try {
+              t.term.refresh(0, t.term.rows - 1);
+              t.term.scrollToBottom();
+            } catch (e) {}
           });
-          // Also resync pty size for the active terminal
+          // Resync pty size for the active terminal
           if (activeId && terminalsRef.current[activeId]) {
             const { term, ws } = terminalsRef.current[activeId];
             if (ws && ws.readyState === WebSocket.OPEN && term) {
               ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
             }
           }
-        }, 300);
+        };
+        setTimeout(doRestore, 300);
+        setTimeout(doRestore, 800);
       }
     };
     document.addEventListener('visibilitychange', handler);
