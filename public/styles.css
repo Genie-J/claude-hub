@@ -557,6 +557,31 @@ html, body, #root {
   gap: 8px;
 }
 
+.file-picker-filter {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.file-picker-filter input {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+}
+
+.file-picker-filter input:focus {
+  border-color: var(--accent);
+}
+
+.file-picker-filter input::placeholder {
+  color: var(--text-muted);
+}
+
 .file-picker-path {
   flex: 1;
   font-size: 11px;
@@ -600,6 +625,16 @@ html, body, #root {
 .file-picker-item.file:hover {
   background: var(--accent-light);
   color: var(--accent);
+}
+
+.file-picker-group-label {
+  padding: 6px 12px 2px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  user-select: none;
 }
 
 .file-picker-empty {

@@ -279,7 +279,9 @@ function App() {
     const term = new Terminal({
       cursorBlink: true,
       fontSize: 15,
-      fontFamily: "'Monaco', 'Menlo', 'SF Mono', 'Courier New', monospace",
+      fontFamily: "'Menlo', 'SF Mono', 'Monaco', 'Courier New', monospace",
+      fontWeight: '500',
+      fontWeightBold: 'bold',
       theme: termTheme,
       allowTransparency: false,
       scrollback: 10000,
@@ -796,7 +798,8 @@ function FolderBrowser({ value, onChange, recentDirs }) {
     setLoading(true);
     try {
       const data = await apiFetch(`/api/browse?path=${encodeURIComponent(dir || '~')}`);
-      setFolders(data.folders);
+      // Normalize: backend returns {name, mtime} objects
+      setFolders((data.folders || []).map(f => typeof f === 'string' ? f : f.name));
       setCurrentDir(data.current);
       setParentDir(data.parent);
       setBrowsing(true);
@@ -890,21 +893,62 @@ function FilePicker({ sessionCwd, onPick, onClose }) {
   const [folders, setFolders] = useState([]);
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [filter, setFilter] = useState('');
+  const filterRef = useRef(null);
   const ref = useRef(null);
 
   const browse = useCallback(async (dir) => {
     setLoading(true);
+    setFilter('');
     try {
       const data = await apiFetch(`/api/browse?path=${encodeURIComponent(dir)}&files=1`);
       setCurrentDir(data.current);
       setParentDir(data.parent);
-      setFolders(data.folders);
+      // Normalize: backend now returns {name, mtime} objects, already sorted by mtime desc
+      setFolders(data.folders || []);
       setFiles(data.files || []);
     } catch (e) {}
     setLoading(false);
   }, []);
 
   useEffect(() => { browse(sessionCwd || '~'); }, []);
+
+  const filteredFolders = useMemo(() => {
+    const list = folders.map(f => typeof f === 'string' ? { name: f, mtime: 0 } : f);
+    if (!filter.trim()) return list;
+    const q = filter.toLowerCase();
+    return list.filter(f => f.name.toLowerCase().includes(q));
+  }, [folders, filter]);
+
+  // Group files by category, each category sorted by mtime desc (already from backend)
+  const FILE_CATEGORIES = [
+    { label: 'Documents', exts: ['md','txt','pdf','doc','docx','rtf','csv','json','yaml','yml','toml','xml'] },
+    { label: 'Code', exts: ['js','ts','jsx','tsx','py','sh','rb','go','rs','java','c','cpp','h','swift','kt','css','html','sql'] },
+    { label: 'Media', exts: ['png','jpg','jpeg','gif','svg','webp','ico','mp4','mov','mp3','wav','m4a'] },
+  ];
+
+  const groupedFiles = useMemo(() => {
+    let list = files.map(f => typeof f === 'string' ? { name: f, mtime: 0 } : f);
+    if (filter.trim()) {
+      const q = filter.toLowerCase();
+      list = list.filter(f => f.name.toLowerCase().includes(q));
+    }
+    const groups = [];
+    const used = new Set();
+    for (const cat of FILE_CATEGORIES) {
+      const items = list.filter(f => {
+        const ext = f.name.split('.').pop().toLowerCase();
+        return cat.exts.includes(ext);
+      });
+      if (items.length > 0) {
+        groups.push({ label: cat.label, items });
+        items.forEach(f => used.add(f.name));
+      }
+    }
+    const other = list.filter(f => !used.has(f.name));
+    if (other.length > 0) groups.push({ label: 'Other', items: other });
+    return groups;
+  }, [files, filter]);
 
   // Close on outside click
   useEffect(() => {
@@ -934,27 +978,44 @@ function FilePicker({ sessionCwd, onPick, onClose }) {
         </span>
         <button class="btn-icon" onClick=${onClose} title="Close">\u2715</button>
       </div>
+      <div class="file-picker-filter">
+        <input
+          ref=${filterRef}
+          value=${filter}
+          onInput=${e => setFilter(e.target.value)}
+          placeholder="Search files by name..."
+          autoFocus
+        />
+      </div>
       <div class="file-picker-list">
-        ${parentDir && html`
+        ${parentDir && !filter.trim() && html`
           <div class="file-picker-item folder" onClick=${() => browse(parentDir)}>
             \u2190\u00a0\u00a0..
           </div>
         `}
         ${loading && html`<div class="file-picker-empty">Loading...</div>`}
-        ${!loading && folders.map(f => html`
-          <div key=${'d-'+f} class="file-picker-item folder"
-            onClick=${() => browse(currentDir + '/' + f)}>
-            \u{1F4C1}\u00a0\u00a0${f}
+        ${!loading && filteredFolders.length > 0 && html`
+          <div class="file-picker-group-label">Folders</div>
+        `}
+        ${!loading && filteredFolders.map(f => html`
+          <div key=${'d-'+f.name} class="file-picker-item folder"
+            onClick=${() => browse(currentDir + '/' + f.name)}>
+            \u{1F4C1}\u00a0\u00a0${f.name}
           </div>
         `)}
-        ${!loading && files.map(f => html`
-          <div key=${'f-'+f} class="file-picker-item file"
-            onClick=${() => onPick(currentDir + '/' + f)}>
-            ${getFileIcon(f)}\u00a0\u00a0${f}
+        ${!loading && groupedFiles.map(g => html`
+          <div key=${g.label}>
+            <div class="file-picker-group-label">${g.label}</div>
+            ${g.items.map(f => html`
+              <div key=${'f-'+f.name} class="file-picker-item file"
+                onClick=${() => onPick(currentDir + '/' + f.name)}>
+                ${getFileIcon(f.name)}\u00a0\u00a0${f.name}
+              </div>
+            `)}
           </div>
         `)}
-        ${!loading && folders.length === 0 && files.length === 0 && html`
-          <div class="file-picker-empty">Empty folder</div>
+        ${!loading && filteredFolders.length === 0 && groupedFiles.length === 0 && html`
+          <div class="file-picker-empty">${filter.trim() ? 'No matches' : 'Empty folder'}</div>
         `}
       </div>
     </div>

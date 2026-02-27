@@ -5,6 +5,36 @@ const pty = require('node-pty');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { execSync } = require('child_process');
+
+// Resolve full path to `claude` binary at startup.
+// node-pty's posix_spawnp may fail if the binary isn't on the
+// inherited PATH (common when Node is launched outside a login shell).
+let CLAUDE_BIN = null;
+try {
+  // Spawn a login shell so ~/.zshrc / ~/.bashrc PATH entries are loaded
+  const shell = process.env.SHELL || '/bin/zsh';
+  CLAUDE_BIN = execSync(`${shell} -lc 'which claude'`, { encoding: 'utf8' }).trim();
+} catch {
+  // Login shell lookup failed — try common install locations
+  const candidates = [
+    path.join(os.homedir(), '.npm-global', 'bin', 'claude'),
+    path.join(os.homedir(), '.local', 'bin', 'claude'),
+    '/usr/local/bin/claude',
+    '/opt/homebrew/bin/claude',
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) { CLAUDE_BIN = c; break; }
+  }
+}
+if (!CLAUDE_BIN) {
+  console.error('ERROR: Could not find `claude` CLI anywhere.');
+  console.error('Make sure Claude Code is installed: npm install -g @anthropic-ai/claude-code');
+  console.error('Or set CLAUDE_BIN env var: CLAUDE_BIN=/path/to/claude node server.js');
+  process.exit(1);
+}
+// Allow manual override via env var
+CLAUDE_BIN = process.env.CLAUDE_BIN || CLAUDE_BIN;
 
 const app = express();
 const server = http.createServer(app);
@@ -100,13 +130,23 @@ app.get('/api/browse', (req, res) => {
     const entries = fs.readdirSync(resolved, { withFileTypes: true });
     const folders = entries
       .filter(e => e.isDirectory() && !e.name.startsWith('.'))
-      .map(e => e.name)
-      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+      .map(e => {
+        try {
+          const st = fs.statSync(path.join(resolved, e.name));
+          return { name: e.name, mtime: st.mtimeMs };
+        } catch { return { name: e.name, mtime: 0 }; }
+      })
+      .sort((a, b) => b.mtime - a.mtime);
     const files = showFiles
       ? entries
           .filter(e => e.isFile() && !e.name.startsWith('.'))
-          .map(e => e.name)
-          .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+          .map(e => {
+            try {
+              const st = fs.statSync(path.join(resolved, e.name));
+              return { name: e.name, mtime: st.mtimeMs };
+            } catch { return { name: e.name, mtime: 0 }; }
+          })
+          .sort((a, b) => b.mtime - a.mtime)
       : [];
     const parent = path.dirname(resolved);
     res.json({ current: resolved, parent: parent !== resolved ? parent : null, folders, files });
@@ -160,7 +200,7 @@ wss.on('connection', (ws) => {
 
           let ptyProcess;
           try {
-            ptyProcess = pty.spawn('claude', cliArgs, {
+            ptyProcess = pty.spawn(CLAUDE_BIN, cliArgs, {
               name: 'xterm-256color',
               cols: msg.cols || 120,
               rows: msg.rows || 40,
@@ -273,6 +313,7 @@ setInterval(() => saveSessions(sessions), 30000);
 // --- Start ---
 server.listen(PORT, () => {
   console.log(`Claude Hub running at http://localhost:${PORT}`);
+  console.log(`Using claude binary: ${CLAUDE_BIN}`);
 });
 
 server.on('error', (err) => {
