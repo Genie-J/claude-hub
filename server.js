@@ -198,9 +198,17 @@ wss.on('connection', (ws) => {
 
           const cliArgs = [...(session.args || [])];
 
+          // Spawn claude via login shell instead of directly.
+          // Direct posix_spawnp fails on some setups where `claude` is a
+          // shell wrapper, or a symlink to a versioned directory/script.
+          // Using `shell -lc` mirrors what happens when users type `claude`
+          // in their own terminal — PATH, env, shebang handling all work.
+          const shell = env.SHELL || '/bin/zsh';
+          const escapedArgs = [CLAUDE_BIN, ...cliArgs].map(a => `"${a.replace(/"/g, '\\"')}"`).join(' ');
+
           let ptyProcess;
           try {
-            ptyProcess = pty.spawn(CLAUDE_BIN, cliArgs, {
+            ptyProcess = pty.spawn(shell, ['-lc', escapedArgs], {
               name: 'xterm-256color',
               cols: msg.cols || 120,
               rows: msg.rows || 40,
