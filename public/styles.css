@@ -502,6 +502,41 @@ html, body, #root {
   width: 100%;
 }
 
+/* ===== Scroll to Bottom Button ===== */
+.scroll-bottom-btn {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(60, 110, 75, 0.65);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 16px;
+  cursor: pointer;
+  z-index: 20;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: breathe 3s ease-in-out infinite;
+  transition: background 0.3s, box-shadow 0.3s;
+}
+
+.scroll-bottom-btn:hover {
+  background: rgba(45, 80, 56, 0.95);
+  box-shadow: 0 4px 20px rgba(45, 80, 56, 0.4);
+  animation: none;
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.6; transform: translateX(-50%) scale(1); }
+  50% { opacity: 0.95; transform: translateX(-50%) scale(1.05); }
+}
+
 /* ===== File Attach Button ===== */
 .file-attach-btn {
   position: absolute;

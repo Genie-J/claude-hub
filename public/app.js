@@ -268,6 +268,29 @@ function App() {
     return () => document.removeEventListener('visibilitychange', handler);
   }, []);
 
+  // Track whether active terminal is scrolled away from bottom
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
+
+  useEffect(() => {
+    if (!activeId) { setShowScrollBtn(false); return; }
+    const check = () => {
+      const container = document.getElementById('term-' + activeId);
+      if (!container) return;
+      const viewport = container.querySelector('.xterm-viewport');
+      if (!viewport) return;
+      const atBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 10;
+      setShowScrollBtn(!atBottom && viewport.scrollHeight > viewport.clientHeight);
+    };
+    const timer = setInterval(check, 300);
+    check();
+    return () => clearInterval(timer);
+  }, [activeId]);
+
+  const scrollToBottom = useCallback(() => {
+    if (!activeId || !terminalsRef.current[activeId]) return;
+    terminalsRef.current[activeId].term.scrollToBottom();
+  }, [activeId]);
+
   // Fit + focus active terminal on tab change or sidebar toggle
   useEffect(() => {
     if (!activeId || !terminalsRef.current[activeId]) return;
@@ -352,6 +375,12 @@ function App() {
         setSessions(prev => prev.map(s =>
           s.id === msg.sessionId ? { ...s, status: msg.status } : s
         ));
+        // Clean up spinner artifacts when Claude goes idle
+        if (msg.status === 'waiting') {
+          requestAnimationFrame(() => {
+            try { term.refresh(0, term.rows - 1); } catch (e) {}
+          });
+        }
       } else if (msg.type === 'error') {
         addToast(msg.message, 'error');
       }
@@ -603,6 +632,13 @@ function App() {
               class=${'terminal-container' + (s.id !== activeId ? ' hidden' : '')}
             />
           `)}
+          ${activeId && sessions.length > 0 && showScrollBtn && html`
+            <button
+              class="scroll-bottom-btn"
+              onClick=${scrollToBottom}
+              title="Scroll to bottom"
+            ><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2.5v9M4 8.5l4 4.5 4-4.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          `}
           ${activeId && sessions.length > 0 && html`
             <button
               class="file-attach-btn"
