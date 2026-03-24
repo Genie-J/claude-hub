@@ -1096,9 +1096,9 @@ function NewSessionDialog({ recentDirs, onCreate, onCancel }) {
   const [name, setName] = useState('');
   const DEFAULT_CWD = '/Users/janet/Desktop/各种文档/Janet知识库';
   const [cwd, setCwd] = useState(DEFAULT_CWD);
-  const [model, setModel] = useState('');
+  const [model, setModel] = useState('claude-opus-4-6');
   const [resumeFlag, setResumeFlag] = useState(false);
-  const [permissionMode, setPermissionMode] = useState('');
+  const [permissionMode, setPermissionMode] = useState('bypassPermissions');
   const dialogRef = useRef(null);
 
   // Sync cwd with recentDirs when they load async
