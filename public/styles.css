@@ -239,6 +239,22 @@ html, body, #root {
   color: var(--red);
 }
 
+/* Tab drag-and-drop */
+.tab-dragging {
+  opacity: 0.4;
+}
+.tab-drag-over {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+/* Sidebar drag-and-drop */
+.sidebar-dragging {
+  opacity: 0.4;
+}
+.sidebar-drag-over {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
 .new-tab-btn {
   width: 34px;
   height: 34px;

@@ -497,6 +497,20 @@ function App() {
     }
   }, [attachTerminal]);
 
+  // Reorder session (move session from one index to another)
+  const reorderSession = useCallback((fromId, toId) => {
+    if (fromId === toId) return;
+    setSessions(prev => {
+      const fromIdx = prev.findIndex(s => s.id === fromId);
+      const toIdx = prev.findIndex(s => s.id === toId);
+      if (fromIdx === -1 || toIdx === -1) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      return next;
+    });
+  }, []);
+
   // Rename session
   const renameSession = useCallback(async (id, newName) => {
     try {
@@ -596,6 +610,7 @@ function App() {
           onClose=${closeSession}
           onNew=${() => setShowDialog(true)}
           onRename=${renameSession}
+          onReorder=${reorderSession}
           onContextMenu=${handleContextMenu}
           tabBarRef=${tabBarRef}
           canScrollLeft=${canScrollLeft}
@@ -612,6 +627,7 @@ function App() {
           onResize=${setSidebarWidth}
           onSelect=${reconnectSession}
           onClose=${closeSession}
+          onReorder=${reorderSession}
           searchQuery=${searchQuery}
           onSearchChange=${setSearchQuery}
           stats=${stats}
@@ -686,9 +702,11 @@ function App() {
 }
 
 // ===== TabBar =====
-function TabBar({ sessions, activeId, onSelect, onClose, onNew, onRename, onContextMenu, tabBarRef, canScrollLeft, canScrollRight }) {
+function TabBar({ sessions, activeId, onSelect, onClose, onNew, onRename, onReorder, onContextMenu, tabBarRef, canScrollLeft, canScrollRight }) {
   const [renamingId, setRenamingId] = useState(null);
   const [renameValue, setRenameValue] = useState('');
+  const [dragOverId, setDragOverId] = useState(null);
+  const dragIdRef = useRef(null);
 
   // Expose rename trigger via window for context menu
   useEffect(() => {
@@ -703,6 +721,34 @@ function TabBar({ sessions, activeId, onSelect, onClose, onNew, onRename, onCont
     setRenamingId(null);
   };
 
+  const onDragStart = useCallback((e, id) => {
+    dragIdRef.current = id;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', id);
+    // Make the dragged tab semi-transparent after a frame
+    requestAnimationFrame(() => { e.target.classList.add('tab-dragging'); });
+  }, []);
+
+  const onDragOver = useCallback((e, id) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverId(id);
+  }, []);
+
+  const onDrop = useCallback((e, toId) => {
+    e.preventDefault();
+    const fromId = dragIdRef.current;
+    if (fromId && fromId !== toId) onReorder(fromId, toId);
+    dragIdRef.current = null;
+    setDragOverId(null);
+  }, [onReorder]);
+
+  const onDragEnd = useCallback((e) => {
+    e.target.classList.remove('tab-dragging');
+    dragIdRef.current = null;
+    setDragOverId(null);
+  }, []);
+
   const wrapperClass = 'tab-bar-wrapper'
     + (canScrollLeft ? ' can-scroll-left' : '')
     + (canScrollRight ? ' can-scroll-right' : '');
@@ -713,10 +759,16 @@ function TabBar({ sessions, activeId, onSelect, onClose, onNew, onRename, onCont
         ${sessions.map(s => html`
           <div
             key=${s.id}
-            class=${'tab' + (s.id === activeId ? ' active' : '')}
+            class=${'tab' + (s.id === activeId ? ' active' : '') + (dragOverId === s.id && dragIdRef.current !== s.id ? ' tab-drag-over' : '')}
+            draggable=${renamingId !== s.id}
             onClick=${() => onSelect(s.id)}
             onDblClick=${() => { setRenamingId(s.id); setRenameValue(s.name); }}
             onContextMenu=${(e) => onContextMenu(e, s.id)}
+            onDragStart=${(e) => onDragStart(e, s.id)}
+            onDragOver=${(e) => onDragOver(e, s.id)}
+            onDrop=${(e) => onDrop(e, s.id)}
+            onDragEnd=${onDragEnd}
+            onDragLeave=${() => { if (dragOverId === s.id) setDragOverId(null); }}
             title=${s.name + ' \u2014 ' + (s.cwd || '')}
           >
             <div class=${'tab-status ' + (s.status || 'disconnected')} />
@@ -747,7 +799,10 @@ function TabBar({ sessions, activeId, onSelect, onClose, onNew, onRename, onCont
 }
 
 // ===== Sidebar =====
-function Sidebar({ sessions, activeId, open, width, onToggle, onResize, onSelect, onClose, searchQuery, onSearchChange, stats, onContextMenu }) {
+function Sidebar({ sessions, activeId, open, width, onToggle, onResize, onSelect, onClose, onReorder, searchQuery, onSearchChange, stats, onContextMenu }) {
+  const [dragOverId, setDragOverId] = useState(null);
+  const dragIdRef = useRef(null);
+
   const handleResizeStart = useCallback((e) => {
     e.preventDefault();
     const startX = e.clientX;
@@ -804,9 +859,15 @@ function Sidebar({ sessions, activeId, open, width, onToggle, onResize, onSelect
         ${sessions.map(s => html`
           <div
             key=${s.id}
-            class=${'sidebar-item' + (s.id === activeId ? ' active' : '')}
+            class=${'sidebar-item' + (s.id === activeId ? ' active' : '') + (dragOverId === s.id && dragIdRef.current !== s.id ? ' sidebar-drag-over' : '')}
+            draggable=${true}
             onClick=${() => onSelect(s.id)}
             onContextMenu=${(e) => onContextMenu(e, s.id)}
+            onDragStart=${(e) => { dragIdRef.current = s.id; e.dataTransfer.effectAllowed = 'move'; requestAnimationFrame(() => e.target.classList.add('sidebar-dragging')); }}
+            onDragOver=${(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverId(s.id); }}
+            onDrop=${(e) => { e.preventDefault(); if (dragIdRef.current && dragIdRef.current !== s.id) onReorder(dragIdRef.current, s.id); dragIdRef.current = null; setDragOverId(null); }}
+            onDragEnd=${(e) => { e.target.classList.remove('sidebar-dragging'); dragIdRef.current = null; setDragOverId(null); }}
+            onDragLeave=${() => { if (dragOverId === s.id) setDragOverId(null); }}
             title=${s.cwd || ''}
           >
             <div class=${'tab-status ' + (s.status || 'disconnected')} />
