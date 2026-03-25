@@ -159,6 +159,11 @@ function App() {
           if (Notification.permission === 'granted') {
             new Notification('Claude Hub', { body: `${s.name} is waiting for input`, silent: false });
           }
+        } else if (s.status === 'waiting' && s.needsPermission && prev === 'active') {
+          addToast(html`<span>\uD83D\uDD14 <span class="toast-session-name">${s.name}</span> needs permission</span>`, 'attention', 8000);
+          if (Notification.permission === 'granted') {
+            new Notification('Claude Hub', { body: `\uD83D\uDD14 ${s.name} needs your permission`, silent: false });
+          }
         } else if (s.status === 'exited') {
           addToast(html`<span><span class="toast-session-name">${s.name}</span> has exited</span>`, 'error', 5000);
         }
@@ -373,7 +378,7 @@ function App() {
         }, 300);
       } else if (msg.type === 'status') {
         setSessions(prev => prev.map(s =>
-          s.id === msg.sessionId ? { ...s, status: msg.status } : s
+          s.id === msg.sessionId ? { ...s, status: msg.status, needsPermission: msg.needsPermission || false } : s
         ));
         // Clean up spinner artifacts when Claude goes idle
         if (msg.status === 'waiting') {
@@ -785,6 +790,7 @@ function TabBar({ sessions, activeId, onSelect, onClose, onNew, onRename, onReor
             ` : html`
               <span class="tab-name">${s.name}</span>
             `}
+            ${s.needsPermission && html`<span class="tab-bell" title="Needs permission">\uD83D\uDD14</span>`}
             <div
               class="tab-close"
               onClick=${(e) => { e.stopPropagation(); onClose(s.id); }}
@@ -872,7 +878,7 @@ function Sidebar({ sessions, activeId, open, width, onToggle, onResize, onSelect
           >
             <div class=${'tab-status ' + (s.status || 'disconnected')} />
             <div class="sidebar-item-info">
-              <div class="sidebar-item-name">${s.name}</div>
+              <div class="sidebar-item-name">${s.name}${s.needsPermission ? html` <span class="tab-bell" title="Needs permission">\uD83D\uDD14</span>` : ''}</div>
               <div class="sidebar-item-meta">
                 <span class="sidebar-item-path">${(s.cwd || '').replace(/^\/Users\/\w+/, '~')}</span>
                 <span class="sidebar-item-time">${timeAgo(s.lastActiveAt)}</span>

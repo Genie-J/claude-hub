@@ -308,8 +308,24 @@ wss.on('connection', (ws) => {
   });
 });
 
+// Strip ANSI escape codes for text analysis
+function stripAnsi(str) {
+  return str.replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07]*\x07)/g, '');
+}
+
+// Detect if the terminal is showing a permission prompt
+function detectPermissionRequest(scrollback) {
+  const tail = stripAnsi(scrollback.slice(-2000));
+  // Claude Code permission prompts: "Allow <tool>(...)" with Yes/No options
+  return /Allow\s+\w+\s*\(/.test(tail) || /Do you want to allow/i.test(tail);
+}
+
 function broadcastStatus(sessionId, entry) {
-  const msg = JSON.stringify({ type: 'status', sessionId, status: entry.status });
+  const payload = { type: 'status', sessionId, status: entry.status };
+  if (entry.status === 'waiting') {
+    payload.needsPermission = detectPermissionRequest(entry.scrollback);
+  }
+  const msg = JSON.stringify(payload);
   entry.wsClients.forEach(c => {
     if (c.readyState === 1) c.send(msg);
   });
