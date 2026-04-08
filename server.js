@@ -237,10 +237,10 @@ wss.on('connection', (ws) => {
           ptyProcess.onData((data) => {
             entry.lastActivity = Date.now();
             entry.status = 'active';
-            // Keep last 100KB of scrollback for re-attach
+            // Keep last 50KB of scrollback for re-attach
             entry.scrollback += data;
-            if (entry.scrollback.length > 100000) {
-              entry.scrollback = entry.scrollback.slice(-80000);
+            if (entry.scrollback.length > 50000) {
+              entry.scrollback = entry.scrollback.slice(-40000);
             }
 
             // Broadcast to all attached clients
@@ -268,7 +268,15 @@ wss.on('connection', (ws) => {
             entry.status = 'exited';
             broadcastStatus(id, entry);
             clearTimeout(activityTimer);
-            // Don't remove from activePtys immediately - let user see the exit state
+            // Release scrollback after 5 minutes to free memory
+            setTimeout(() => {
+              if (activePtys.has(id)) {
+                const e = activePtys.get(id);
+                if (e.status === 'exited') {
+                  e.scrollback = '';
+                }
+              }
+            }, 5 * 60 * 1000);
           });
 
           ws.send(JSON.stringify({ type: 'attached', sessionId: id, status: 'active' }));
@@ -316,13 +324,20 @@ function stripAnsi(str) {
 // Detect if the terminal is showing a permission prompt
 function detectPermissionRequest(scrollback) {
   const tail = stripAnsi(scrollback.slice(-2000));
-  // Claude Code permission prompts: "Allow <tool>(...)" with Yes/No options
-  return /Allow\s+\w+\s*\(/.test(tail) || /Do you want to allow/i.test(tail);
+  // Claude Code permission prompts come in several forms:
+  // - "Do you want to make this edit to X?" with 1. Yes / 2. Yes, and allow / 3. No
+  // - "Do you want to allow X?"
+  // - "Allow <tool>(...)" with Yes/No
+  // Common signal: numbered options ending with "No" or "Deny"
+  return /Allow\s+\w+\s*\(/.test(tail)
+    || /Do you want to (allow|make this|run|execute|create|delete)/i.test(tail)
+    || /\d\.\s*(Yes,? and allow|No)\s*$/m.test(tail);
 }
 
 function broadcastStatus(sessionId, entry) {
   const payload = { type: 'status', sessionId, status: entry.status };
   if (entry.status === 'waiting') {
+    const tail = stripAnsi(entry.scrollback.slice(-2000));
     payload.needsPermission = detectPermissionRequest(entry.scrollback);
   }
   const msg = JSON.stringify(payload);

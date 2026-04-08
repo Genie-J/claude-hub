@@ -346,7 +346,7 @@ function App() {
       fontWeightBold: 'bold',
       theme: termTheme,
       allowTransparency: false,
-      scrollback: 10000,
+      scrollback: 3000,
       convertEol: true,
     });
 
@@ -1163,7 +1163,7 @@ function NewSessionDialog({ recentDirs, onCreate, onCancel }) {
   const [name, setName] = useState('');
   const DEFAULT_CWD = '/Users/janet/Desktop/各种文档/Janet知识库';
   const [cwd, setCwd] = useState(DEFAULT_CWD);
-  const [model, setModel] = useState('claude-opus-4-6');
+  const [model, setModel] = useState('');
   const [resumeFlag, setResumeFlag] = useState(false);
   const [permissionMode, setPermissionMode] = useState('bypassPermissions');
   const dialogRef = useRef(null);
@@ -1222,8 +1222,10 @@ function NewSessionDialog({ recentDirs, onCreate, onCancel }) {
               onChange=${setModel}
               options=${[
                 { value: '', label: 'Default' },
-                { value: 'claude-opus-4-6', label: 'Opus 4.6' },
-                { value: 'claude-sonnet-4-6', label: 'Sonnet 4.6' },
+                { value: 'claude-opus-4-6[1m]', label: 'Opus 4.6 (1M)' },
+                { value: 'claude-opus-4-6', label: 'Opus 4.6 (200K)' },
+                { value: 'claude-sonnet-4-6[1m]', label: 'Sonnet 4.6 (1M)' },
+                { value: 'claude-sonnet-4-6', label: 'Sonnet 4.6 (200K)' },
               ]}
             />
           </div>
