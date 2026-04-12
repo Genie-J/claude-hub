@@ -5,14 +5,14 @@
 }
 
 :root {
-  --bg-primary: #f0ede6;
-  --bg-secondary: #e8e4dc;
-  --bg-tertiary: #dfd9ce;
-  --bg-tab: #e3dfd7;
-  --bg-tab-active: #f0ede6;
-  --bg-tab-hover: #d8d3c8;
-  --border: #cdc7ba;
-  --border-light: #dad5cb;
+  --bg-primary: #f5f3ed;
+  --bg-secondary: #eceae3;
+  --bg-tertiary: #e3e0d8;
+  --bg-tab: #e7e4dc;
+  --bg-tab-active: #f5f3ed;
+  --bg-tab-hover: #dcd9d0;
+  --border: rgba(59,56,51,0.10);
+  --border-light: rgba(59,56,51,0.06);
   --text-primary: #3b3833;
   --text-secondary: #5c574f;
   --text-muted: #8a847a;
@@ -22,10 +22,10 @@
   --green: #6b8f71;
   --yellow: #c49a2a;
   --red: #c25d4e;
-  --surface: #e3dfd7;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
-  --shadow-lg: 0 12px 40px rgba(0,0,0,0.12);
+  --surface: #e7e4dc;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.02), 0 2px 4px rgba(0,0,0,0.03);
+  --shadow-md: 0 1px 3px rgba(0,0,0,0.01), 0 3px 7px rgba(0,0,0,0.02), 0 7px 15px rgba(0,0,0,0.03);
+  --shadow-lg: 0 1px 3px rgba(0,0,0,0.01), 0 3px 7px rgba(0,0,0,0.02), 0 7px 15px rgba(0,0,0,0.02), 0 14px 28px rgba(0,0,0,0.04), 0 23px 52px rgba(0,0,0,0.05);
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
@@ -66,7 +66,7 @@ html, body, #root {
   font-size: 16px;
   color: var(--text-secondary);
   white-space: nowrap;
-  letter-spacing: -0.2px;
+  letter-spacing: -0.4px;
   flex-shrink: 0;
   padding: 0 16px;
   border-right: 1px solid var(--border);
@@ -149,7 +149,7 @@ html, body, #root {
   min-width: 130px;
   max-width: 220px;
   height: 34px;
-  transition: background var(--transition);
+  transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
   user-select: none;
   flex-shrink: 0;
   position: relative;
@@ -157,6 +157,8 @@ html, body, #root {
 
 .tab:hover {
   background: var(--bg-tab-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
 }
 
 .tab.active {
@@ -422,12 +424,13 @@ html, body, #root {
   display: flex;
   align-items: center;
   gap: 10px;
-  transition: background var(--transition);
+  transition: background var(--transition), transform var(--transition);
   margin-bottom: 2px;
 }
 
 .sidebar-item:hover {
   background: var(--surface);
+  transform: translateX(2px);
 }
 
 .sidebar-item.active {
@@ -805,10 +808,10 @@ html, body, #root {
 }
 
 .dialog-title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   margin-bottom: 24px;
-  letter-spacing: -0.2px;
+  letter-spacing: -0.5px;
 }
 
 .dialog-field {
@@ -1094,7 +1097,7 @@ html, body, #root {
 }
 
 .btn-primary:active {
-  transform: scale(0.98);
+  transform: scale(0.96);
 }
 
 .btn-secondary {

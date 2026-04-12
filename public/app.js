@@ -86,11 +86,11 @@ function CustomSelect({ value, onChange, options, placeholder }) {
 
 // ===== Terminal Theme =====
 const termTheme = {
-  background: '#f0ede6',
+  background: '#f5f3ed',
   foreground: '#3b3833',
   cursor: '#5c574f',
-  cursorAccent: '#f0ede6',
-  selectionBackground: '#cdc7ba',
+  cursorAccent: '#f5f3ed',
+  selectionBackground: '#ddd9d0',
   selectionForeground: '#3b3833',
   black: '#3b3833',
   red: '#c25d4e',
@@ -99,7 +99,7 @@ const termTheme = {
   blue: '#5a7a9e',
   magenta: '#8b6d9e',
   cyan: '#5a8f8f',
-  white: '#e8e4dc',
+  white: '#eceae3',
   brightBlack: '#8a847a',
   brightRed: '#d4685a',
   brightGreen: '#7da383',
@@ -107,7 +107,7 @@ const termTheme = {
   brightBlue: '#6a8ab0',
   brightMagenta: '#9d7fb0',
   brightCyan: '#6aa0a0',
-  brightWhite: '#f0ede6',
+  brightWhite: '#f5f3ed',
 };
 
 // ===== WebSocket =====
