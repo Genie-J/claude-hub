@@ -1338,6 +1338,8 @@ function NewSessionDialog({ recentDirs, onCreate, onCancel }) {
                 { value: '', label: 'Default' },
                 { value: 'claude-opus-4-7[1m]', label: 'Opus 4.7 (1M)' },
                 { value: 'claude-opus-4-7', label: 'Opus 4.7 (200K)' },
+                { value: 'claude-opus-4-6[1m]', label: 'Opus 4.6 (1M)' },
+                { value: 'claude-opus-4-6', label: 'Opus 4.6 (200K)' },
                 { value: 'claude-sonnet-4-6[1m]', label: 'Sonnet 4.6 (1M)' },
                 { value: 'claude-sonnet-4-6', label: 'Sonnet 4.6 (200K)' },
               ]}
