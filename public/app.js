@@ -84,6 +84,91 @@ function CustomSelect({ value, onChange, options, placeholder }) {
   `;
 }
 
+// ===== Terminal Highlights (persistent visual anchors) =====
+// Cmd/Ctrl+Shift+H on a terminal selection toggles a warm amber highlight.
+// Constraints: lives within xterm scrollback (3000 lines); markers are lost
+// when that content scrolls out or the terminal is cleared/rewritten.
+const HL_BG = 'rgba(196,154,42,0.28)';
+
+const hlKey = (sid) => `hub-highlights-${sid}`;
+function loadHighlights(sid) {
+  try { return JSON.parse(localStorage.getItem(hlKey(sid)) || '[]'); }
+  catch { return []; }
+}
+function saveHighlights(sid, records) {
+  try { localStorage.setItem(hlKey(sid), JSON.stringify(records)); } catch {}
+}
+function clearStoredHighlights(sid) {
+  try { localStorage.removeItem(hlKey(sid)); } catch {}
+}
+
+// Register decorations for one record. Returns [{deco, marker}, ...].
+function applyHighlightRecord(term, record) {
+  const out = [];
+  const buf = term.buffer.active;
+  const cursorAbs = buf.baseY + buf.cursorY;
+  for (const line of record.lines) {
+    const offset = line.absY - cursorAbs;
+    let marker;
+    try { marker = term.registerMarker(offset); } catch { continue; }
+    if (!marker) continue;
+    const deco = term.registerDecoration({
+      marker,
+      x: line.x,
+      width: line.width,
+      height: 1,
+      backgroundColor: HL_BG,
+      layer: 'bottom',
+    });
+    if (!deco) { try { marker.dispose(); } catch {} continue; }
+    deco.onRender(el => {
+      el.classList.add('hub-highlight');
+    });
+    out.push({ deco, marker });
+  }
+  return out;
+}
+
+// Toggle highlight at current selection. Returns 'added' | 'removed' | null.
+function toggleHighlightAtSelection(sessionId, entry) {
+  const { term } = entry;
+  const sel = term.getSelectionPosition();
+  const text = term.getSelection();
+  if (!sel || !text || !text.trim()) return null;
+
+  const lines = [];
+  for (let y = sel.start.y; y <= sel.end.y; y++) {
+    const x = (y === sel.start.y) ? sel.start.x : 0;
+    const endX = (y === sel.end.y) ? sel.end.x : term.cols;
+    const width = Math.max(1, endX - x);
+    lines.push({ absY: y, x, width });
+  }
+
+  entry.highlights = entry.highlights || [];
+  const overlapIdx = entry.highlights.findIndex(h =>
+    h.record.lines.some(l => lines.some(nl => nl.absY === l.absY))
+  );
+
+  if (overlapIdx >= 0) {
+    const [rm] = entry.highlights.splice(overlapIdx, 1);
+    rm.decorations.forEach(({ deco, marker }) => {
+      try { deco.dispose(); } catch {}
+      try { marker.dispose(); } catch {}
+    });
+    saveHighlights(sessionId, entry.highlights.map(h => h.record));
+    term.clearSelection();
+    return 'removed';
+  }
+
+  const record = { lines, text: text.slice(0, 500), ts: Date.now() };
+  const decorations = applyHighlightRecord(term, record);
+  if (decorations.length === 0) return null;
+  entry.highlights.push({ record, decorations });
+  saveHighlights(sessionId, entry.highlights.map(h => h.record));
+  term.clearSelection();
+  return 'added';
+}
+
 // ===== Terminal Theme =====
 const termTheme = {
   background: '#f5f3ed',
@@ -413,9 +498,37 @@ function App() {
       }
     });
 
-    terminalsRef.current[sessionId] = { term, ws, fitAddon, resizeObserver: null };
+    terminalsRef.current[sessionId] = { term, ws, fitAddon, resizeObserver: null, highlights: [] };
+
+    // Cmd/Ctrl+Shift+H → toggle highlight on current selection
+    term.attachCustomKeyEventHandler((ev) => {
+      if (ev.type !== 'keydown') return true;
+      const mod = ev.metaKey || ev.ctrlKey;
+      if (mod && ev.shiftKey && (ev.key === 'H' || ev.key === 'h')) {
+        ev.preventDefault();
+        const entry = terminalsRef.current[sessionId];
+        if (!entry) return false;
+        const result = toggleHighlightAtSelection(sessionId, entry);
+        if (result === 'added') addToast('Highlighted', 'info', 1500);
+        else if (result === 'removed') addToast('Highlight removed', 'info', 1500);
+        else addToast('Select text first (drag to select), then ⌘⇧H', 'info', 2500);
+        return false;
+      }
+      return true;
+    });
 
     term.open(container);
+
+    // Restore saved highlights after terminal DOM is ready
+    requestAnimationFrame(() => {
+      const entry = terminalsRef.current[sessionId];
+      if (!entry) return;
+      const stored = loadHighlights(sessionId);
+      for (const record of stored) {
+        const decorations = applyHighlightRecord(term, record);
+        if (decorations.length) entry.highlights.push({ record, decorations });
+      }
+    });
 
     // Use ResizeObserver for reliable fitting
     const debouncedFit = debounce(() => {
@@ -474,6 +587,7 @@ function App() {
       if (t.term) try { t.term.dispose(); } catch (e) {}
       delete terminalsRef.current[id];
     }
+    clearStoredHighlights(id);
     try {
       await apiFetch(`/api/sessions/${id}`, { method: 'DELETE' });
     } catch (err) {
@@ -1163,7 +1277,7 @@ function NewSessionDialog({ recentDirs, onCreate, onCancel }) {
   const [name, setName] = useState('');
   const DEFAULT_CWD = '/Users/janet/Desktop/各种文档/Janet知识库';
   const [cwd, setCwd] = useState(DEFAULT_CWD);
-  const [model, setModel] = useState('');
+  const [model, setModel] = useState('claude-opus-4-7[1m]');
   const [resumeFlag, setResumeFlag] = useState(false);
   const [permissionMode, setPermissionMode] = useState('bypassPermissions');
   const dialogRef = useRef(null);
@@ -1222,8 +1336,8 @@ function NewSessionDialog({ recentDirs, onCreate, onCancel }) {
               onChange=${setModel}
               options=${[
                 { value: '', label: 'Default' },
-                { value: 'claude-opus-4-6[1m]', label: 'Opus 4.6 (1M)' },
-                { value: 'claude-opus-4-6', label: 'Opus 4.6 (200K)' },
+                { value: 'claude-opus-4-7[1m]', label: 'Opus 4.7 (1M)' },
+                { value: 'claude-opus-4-7', label: 'Opus 4.7 (200K)' },
                 { value: 'claude-sonnet-4-6[1m]', label: 'Sonnet 4.6 (1M)' },
                 { value: 'claude-sonnet-4-6', label: 'Sonnet 4.6 (200K)' },
               ]}
