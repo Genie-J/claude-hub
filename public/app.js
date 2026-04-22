@@ -287,10 +287,32 @@ function App() {
           if (idx < prev.length) setActiveId(prev[idx].id);
           return prev;
         });
+      } else if (mod && e.shiftKey && (e.key === 'M' || e.key === 'm')) {
+        // Toggle highlight on active terminal's current selection
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[Hub Highlight] ⌘⇧M pressed, activeId=', activeId);
+        if (!activeId) {
+          addToast('No active session', 'info', 1500);
+          return;
+        }
+        const entry = terminalsRef.current[activeId];
+        if (!entry || !entry.term) {
+          addToast('Terminal not ready', 'info', 1500);
+          return;
+        }
+        const selText = entry.term.getSelection();
+        console.log('[Hub Highlight] selection =', JSON.stringify(selText));
+        const result = toggleHighlightAtSelection(activeId, entry);
+        console.log('[Hub Highlight] result =', result);
+        if (result === 'added') addToast('Highlighted', 'info', 1500);
+        else if (result === 'removed') addToast('Highlight removed', 'info', 1500);
+        else addToast('Drag to select text first, then ⌘⇧M', 'info', 2500);
       }
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    // Capture phase so we beat any terminal/TUI handlers
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
   }, [activeId]);
 
   // Close context menu on click anywhere
@@ -499,23 +521,6 @@ function App() {
     });
 
     terminalsRef.current[sessionId] = { term, ws, fitAddon, resizeObserver: null, highlights: [] };
-
-    // Cmd/Ctrl+Shift+H → toggle highlight on current selection
-    term.attachCustomKeyEventHandler((ev) => {
-      if (ev.type !== 'keydown') return true;
-      const mod = ev.metaKey || ev.ctrlKey;
-      if (mod && ev.shiftKey && (ev.key === 'H' || ev.key === 'h')) {
-        ev.preventDefault();
-        const entry = terminalsRef.current[sessionId];
-        if (!entry) return false;
-        const result = toggleHighlightAtSelection(sessionId, entry);
-        if (result === 'added') addToast('Highlighted', 'info', 1500);
-        else if (result === 'removed') addToast('Highlight removed', 'info', 1500);
-        else addToast('Select text first (drag to select), then ⌘⇧H', 'info', 2500);
-        return false;
-      }
-      return true;
-    });
 
     term.open(container);
 
