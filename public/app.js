@@ -92,7 +92,7 @@ function CustomSelect({ value, onChange, options, placeholder }) {
 // The `absY` we store is a buffer-local absolute row, which is not stable
 // across new Terminal instances — so restoring from localStorage across
 // re-attach would land on wrong rows. That path is intentionally omitted.
-const HL_HEX = '#c49a2a';
+const HL_HEX = '#FFF797';
 
 // Coord system (verified by live test on xterm 5.5.0):
 //   getSelectionPosition().start/end: 0-based; start inclusive; end.x exclusive,

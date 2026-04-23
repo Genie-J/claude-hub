@@ -1248,7 +1248,7 @@ html, body, #root {
 
 /* ===== Terminal Highlights ===== */
 .hub-highlight {
-  background-color: rgba(196, 154, 42, 0.28) !important;
+  background-color: #FFF797 !important;
   mix-blend-mode: multiply;
   pointer-events: none;
 }
