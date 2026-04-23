@@ -84,30 +84,39 @@ function CustomSelect({ value, onChange, options, placeholder }) {
   `;
 }
 
-// ===== Terminal Highlights (persistent visual anchors) =====
-// Cmd/Ctrl+Shift+H on a terminal selection toggles a warm amber highlight.
-// Constraints: lives within xterm scrollback (3000 lines); markers are lost
-// when that content scrolls out or the terminal is cleared/rewritten.
-const HL_BG = 'rgba(196,154,42,0.28)';
+// ===== Terminal Highlights (in-session visual anchors) =====
+// Cmd/Ctrl+Shift+L on a terminal selection toggles a warm amber highlight.
+// In-memory only: highlights persist within the current session/attach, but
+// drop when the session is closed, the page reloads, or the terminal is
+// cleared/rewritten (TUI apps, alt buffer, clear command, etc.).
+// The `absY` we store is a buffer-local absolute row, which is not stable
+// across new Terminal instances — so restoring from localStorage across
+// re-attach would land on wrong rows. That path is intentionally omitted.
+const HL_HEX = '#c49a2a';
 
-const hlKey = (sid) => `hub-highlights-${sid}`;
-function loadHighlights(sid) {
-  try { return JSON.parse(localStorage.getItem(hlKey(sid)) || '[]'); }
-  catch { return []; }
-}
-function saveHighlights(sid, records) {
-  try { localStorage.setItem(hlKey(sid), JSON.stringify(records)); } catch {}
-}
-function clearStoredHighlights(sid) {
-  try { localStorage.removeItem(hlKey(sid)); } catch {}
+// Coord system (verified by live test on xterm 5.5.0):
+//   getSelectionPosition().start/end: 0-based; start inclusive; end.x exclusive,
+//   end.y inclusive on the last selected row.
+//   buffer.active.baseY/cursorY: 0-based. registerDecoration.x: 0-based.
+// All one system — no normalization needed.
+function buildHighlightLines(term, sel) {
+  const lines = [];
+  const startY = sel.start.y;
+  const endY = sel.end.y;
+  for (let y = startY; y <= endY; y++) {
+    const x = (y === startY) ? sel.start.x : 0;
+    const lastX = (y === endY) ? sel.end.x : term.cols;
+    const width = Math.max(1, lastX - x);
+    lines.push({ absY: y, x, width });
+  }
+  return lines;
 }
 
-// Register decorations for one record. Returns [{deco, marker}, ...].
-function applyHighlightRecord(term, record) {
+function applyLinesAsHighlight(term, lines) {
   const out = [];
   const buf = term.buffer.active;
   const cursorAbs = buf.baseY + buf.cursorY;
-  for (const line of record.lines) {
+  for (const line of lines) {
     const offset = line.absY - cursorAbs;
     let marker;
     try { marker = term.registerMarker(offset); } catch { continue; }
@@ -117,36 +126,28 @@ function applyHighlightRecord(term, record) {
       x: line.x,
       width: line.width,
       height: 1,
-      backgroundColor: HL_BG,
+      backgroundColor: HL_HEX,
       layer: 'bottom',
     });
     if (!deco) { try { marker.dispose(); } catch {} continue; }
-    deco.onRender(el => {
-      el.classList.add('hub-highlight');
-    });
+    deco.onRender(el => { el.classList.add('hub-highlight'); });
     out.push({ deco, marker });
   }
   return out;
 }
 
-// Toggle highlight at current selection. Returns 'added' | 'removed' | null.
-function toggleHighlightAtSelection(sessionId, entry) {
+// Returns 'added' | 'removed' | 'alt-buffer' | 'no-selection' | 'failed'
+function toggleHighlightAtSelection(entry) {
   const { term } = entry;
+  if (term.buffer.active.type === 'alternate') return 'alt-buffer';
   const sel = term.getSelectionPosition();
   const text = term.getSelection();
-  if (!sel || !text || !text.trim()) return null;
+  if (!sel || !text || !text.trim()) return 'no-selection';
 
-  const lines = [];
-  for (let y = sel.start.y; y <= sel.end.y; y++) {
-    const x = (y === sel.start.y) ? sel.start.x : 0;
-    const endX = (y === sel.end.y) ? sel.end.x : term.cols;
-    const width = Math.max(1, endX - x);
-    lines.push({ absY: y, x, width });
-  }
-
+  const lines = buildHighlightLines(term, sel);
   entry.highlights = entry.highlights || [];
   const overlapIdx = entry.highlights.findIndex(h =>
-    h.record.lines.some(l => lines.some(nl => nl.absY === l.absY))
+    h.lines.some(l => lines.some(nl => nl.absY === l.absY))
   );
 
   if (overlapIdx >= 0) {
@@ -155,16 +156,13 @@ function toggleHighlightAtSelection(sessionId, entry) {
       try { deco.dispose(); } catch {}
       try { marker.dispose(); } catch {}
     });
-    saveHighlights(sessionId, entry.highlights.map(h => h.record));
     term.clearSelection();
     return 'removed';
   }
 
-  const record = { lines, text: text.slice(0, 500), ts: Date.now() };
-  const decorations = applyHighlightRecord(term, record);
-  if (decorations.length === 0) return null;
-  entry.highlights.push({ record, decorations });
-  saveHighlights(sessionId, entry.highlights.map(h => h.record));
+  const decorations = applyLinesAsHighlight(term, lines);
+  if (decorations.length === 0) return 'failed';
+  entry.highlights.push({ lines, decorations });
   term.clearSelection();
   return 'added';
 }
@@ -287,27 +285,19 @@ function App() {
           if (idx < prev.length) setActiveId(prev[idx].id);
           return prev;
         });
-      } else if (mod && e.shiftKey && (e.key === 'M' || e.key === 'm')) {
+      } else if (mod && e.shiftKey && (e.key === 'L' || e.key === 'l')) {
         // Toggle highlight on active terminal's current selection
         e.preventDefault();
         e.stopPropagation();
-        console.log('[Hub Highlight] ⌘⇧M pressed, activeId=', activeId);
-        if (!activeId) {
-          addToast('No active session', 'info', 1500);
-          return;
-        }
+        if (!activeId) { addToast('No active session', 'info', 1500); return; }
         const entry = terminalsRef.current[activeId];
-        if (!entry || !entry.term) {
-          addToast('Terminal not ready', 'info', 1500);
-          return;
-        }
-        const selText = entry.term.getSelection();
-        console.log('[Hub Highlight] selection =', JSON.stringify(selText));
-        const result = toggleHighlightAtSelection(activeId, entry);
-        console.log('[Hub Highlight] result =', result);
+        if (!entry || !entry.term) { addToast('Terminal not ready', 'info', 1500); return; }
+        const result = toggleHighlightAtSelection(entry);
         if (result === 'added') addToast('Highlighted', 'info', 1500);
         else if (result === 'removed') addToast('Highlight removed', 'info', 1500);
-        else addToast('Drag to select text first, then ⌘⇧M', 'info', 2500);
+        else if (result === 'alt-buffer') addToast('Cannot highlight in TUI apps (vim/less/etc.)', 'info', 2500);
+        else if (result === 'failed') addToast('Highlight failed — try again', 'info', 2000);
+        else addToast('Drag to select text first, then ⌘⇧L', 'info', 2500);
       }
     };
     // Capture phase so we beat any terminal/TUI handlers
@@ -455,6 +445,7 @@ function App() {
       allowTransparency: false,
       scrollback: 3000,
       convertEol: true,
+      allowProposedApi: true,  // needed for registerMarker / registerDecoration (highlights)
     });
 
     const fitAddon = new FitAddon.FitAddon();
@@ -521,19 +512,10 @@ function App() {
     });
 
     terminalsRef.current[sessionId] = { term, ws, fitAddon, resizeObserver: null, highlights: [] };
+    // Debug hatch — lets DevTools reach terminals without React internals
+    if (typeof window !== 'undefined') window.__hubTerms = terminalsRef.current;
 
     term.open(container);
-
-    // Restore saved highlights after terminal DOM is ready
-    requestAnimationFrame(() => {
-      const entry = terminalsRef.current[sessionId];
-      if (!entry) return;
-      const stored = loadHighlights(sessionId);
-      for (const record of stored) {
-        const decorations = applyHighlightRecord(term, record);
-        if (decorations.length) entry.highlights.push({ record, decorations });
-      }
-    });
 
     // Use ResizeObserver for reliable fitting
     const debouncedFit = debounce(() => {
@@ -592,7 +574,6 @@ function App() {
       if (t.term) try { t.term.dispose(); } catch (e) {}
       delete terminalsRef.current[id];
     }
-    clearStoredHighlights(id);
     try {
       await apiFetch(`/api/sessions/${id}`, { method: 'DELETE' });
     } catch (err) {
