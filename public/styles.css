@@ -614,7 +614,7 @@ html, body, #root {
   top: 4px;
   left: 8px;
   right: 8px;
-  bottom: 0;
+  bottom: 8px;
   width: auto;
   height: auto;
   overflow: hidden;
@@ -628,6 +628,8 @@ html, body, #root {
 .terminal-container .xterm {
   height: 100%;
   width: 100%;
+  /* 中英数字混排对齐(对齐 Obsidian notion-typography DNA) */
+  font-variant-numeric: tabular-nums;
 }
 
 /* ===== Scroll to Bottom Button ===== */

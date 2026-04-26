@@ -288,7 +288,7 @@ const THEMES = {
   },
   'paper-white': {
     background: '#fbfbfa',
-    foreground: '#1a1817',
+    foreground: '#37352F',
     cursor: '#4a4845',
     cursorAccent: '#fbfbfa',
     selectionBackground: '#d8d8d4',
@@ -632,13 +632,16 @@ function App() {
 
     const term = new Terminal({
       cursorBlink: true,
+      cursorStyle: 'bar',
       fontSize: 15,
-      fontFamily: "'Menlo', 'SF Mono', 'Monaco', 'Courier New', monospace",
-      fontWeight: '500',
-      fontWeightBold: 'bold',
+      fontFamily: "'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace",
+      fontWeight: '400',
+      fontWeightBold: '600',
+      lineHeight: 1.5,
+      minimumContrastRatio: 4.5,
       theme: THEMES[initialTheme] || THEMES['warm-beige'],
       allowTransparency: false,
-      scrollback: 3000,
+      scrollback: 10000,
       convertEol: true,
       allowProposedApi: true,  // needed for registerMarker / registerDecoration (highlights)
     });
