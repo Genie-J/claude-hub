@@ -163,35 +163,170 @@ function toggleHighlightAtSelection(entry) {
   const decorations = applyLinesAsHighlight(term, lines);
   if (decorations.length === 0) return 'failed';
   entry.highlights.push({ lines, decorations });
+  // Cap to avoid unbounded marker accumulation in long sessions.
+  while (entry.highlights.length > HIGHLIGHT_LIMIT) {
+    const oldest = entry.highlights.shift();
+    oldest?.decorations?.forEach(d => { try { d.dispose(); } catch (_) {} });
+  }
   term.clearSelection();
   return 'added';
 }
 
-// ===== Terminal Theme =====
-const termTheme = {
-  background: '#f5f3ed',
-  foreground: '#3b3833',
-  cursor: '#5c574f',
-  cursorAccent: '#f5f3ed',
-  selectionBackground: '#ddd9d0',
-  selectionForeground: '#3b3833',
-  black: '#3b3833',
-  red: '#c25d4e',
-  green: '#6b8f71',
-  yellow: '#c49a2a',
-  blue: '#5a7a9e',
-  magenta: '#8b6d9e',
-  cyan: '#5a8f8f',
-  white: '#eceae3',
-  brightBlack: '#8a847a',
-  brightRed: '#d4685a',
-  brightGreen: '#7da383',
-  brightYellow: '#d4a93a',
-  brightBlue: '#6a8ab0',
-  brightMagenta: '#9d7fb0',
-  brightCyan: '#6aa0a0',
-  brightWhite: '#f5f3ed',
+// ===== OSC 133 Prompt Marks (跳上/下一条命令) =====
+// 依赖 shell 集成发送 OSC 133 序列(zsh-vscode、starship 等支持)。
+// 没装的话 entry.promptMarks 一直为空,⌘↑/↓ 走 toast 提示。
+const PROMPT_MARK_LIMIT = 200;
+const HIGHLIGHT_LIMIT = 100;
+
+function recordPromptMark(entry, type, exitCode) {
+  const { term } = entry;
+  if (!term) return;
+  entry.promptMarks = entry.promptMarks || [];
+
+  if (type === 'A') {
+    // Prompt 开始 — 记录 marker(buffer 滚动后行号会变,marker 稳定)
+    let marker;
+    try { marker = term.registerMarker(0); } catch { return; }
+    if (!marker) return;
+    entry.promptMarks.push({ marker, exitCode: null, decoration: null });
+    // 上限保护
+    while (entry.promptMarks.length > PROMPT_MARK_LIMIT) {
+      const old = entry.promptMarks.shift();
+      try { old.decoration && old.decoration.dispose(); } catch {}
+      try { old.marker && old.marker.dispose(); } catch {}
+    }
+  } else if (type === 'D') {
+    // 命令结束,带 exit code — 给最后一个 prompt mark 上失败装饰
+    const last = entry.promptMarks[entry.promptMarks.length - 1];
+    if (!last) return;
+    last.exitCode = exitCode;
+    if (exitCode != null && exitCode !== 0 && !last.decoration) {
+      try {
+        const deco = term.registerDecoration({
+          marker: last.marker,
+          x: 0,
+          width: 1,
+          height: 1,
+          backgroundColor: '#c25d4e',
+          layer: 'top',
+        });
+        if (deco) {
+          deco.onRender(el => { el.classList.add('hub-cmd-failed'); });
+          last.decoration = deco;
+        }
+      } catch {}
+    }
+  }
+}
+
+function jumpPrompt(entry, dir, toast) {
+  const { term } = entry;
+  const marks = entry.promptMarks || [];
+  if (!term || marks.length === 0) {
+    if (toast) toast('No prompt marks (install shell integration for ⌘↑/⌘↓)', 'info', 2500);
+    return;
+  }
+  // viewport 顶部对应的 buffer 行号
+  const buf = term.buffer.active;
+  const viewportTopAbs = buf.viewportY;
+  // 找到合适的目标 mark
+  const lines = marks.map(m => m.marker && !m.marker.isDisposed ? m.marker.line : -1);
+  let targetLine = -1;
+  if (dir < 0) {
+    // 上一条:严格 < viewportTop 的最大 line
+    for (let i = lines.length - 1; i >= 0; i--) {
+      if (lines[i] >= 0 && lines[i] < viewportTopAbs) { targetLine = lines[i]; break; }
+    }
+    if (targetLine < 0 && lines.length) {
+      // 已经是最早,跳到最早一条
+      const valid = lines.filter(l => l >= 0);
+      if (valid.length) targetLine = Math.min(...valid);
+    }
+  } else {
+    // 下一条:严格 > viewportTop 的最小 line
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i] >= 0 && lines[i] > viewportTopAbs) { targetLine = lines[i]; break; }
+    }
+    if (targetLine < 0 && lines.length) {
+      const valid = lines.filter(l => l >= 0);
+      if (valid.length) targetLine = Math.max(...valid);
+    }
+  }
+  if (targetLine < 0) {
+    if (toast) toast('No prompt marks', 'info', 1500);
+    return;
+  }
+  try { term.scrollToLine(targetLine); } catch {}
+}
+
+// ===== Terminal Themes (4 套) =====
+// 语义角色和 CSS 变量保持一致;切换时同时改 xterm options.theme + document.documentElement[data-theme]。
+const THEMES = {
+  'warm-beige': {
+    background: '#f5f3ed',
+    foreground: '#3b3833',
+    cursor: '#5c574f',
+    cursorAccent: '#f5f3ed',
+    selectionBackground: '#ddd9d0',
+    selectionForeground: '#3b3833',
+    black: '#3b3833', red: '#c25d4e', green: '#6b8f71', yellow: '#c49a2a',
+    blue: '#5a7a9e', magenta: '#8b6d9e', cyan: '#5a8f8f', white: '#eceae3',
+    brightBlack: '#8a847a', brightRed: '#d4685a', brightGreen: '#7da383', brightYellow: '#d4a93a',
+    brightBlue: '#6a8ab0', brightMagenta: '#9d7fb0', brightCyan: '#6aa0a0', brightWhite: '#f5f3ed',
+  },
+  'dark-mocha': {
+    background: '#2a2622',
+    foreground: '#e8dfd0',
+    cursor: '#b8ad9b',
+    cursorAccent: '#2a2622',
+    selectionBackground: '#4a423a',
+    selectionForeground: '#e8dfd0',
+    black: '#1a1714', red: '#d68070', green: '#9ec0a4', yellow: '#d4a93a',
+    blue: '#8aa8c4', magenta: '#b094c0', cyan: '#8ab8b8', white: '#c8bfae',
+    brightBlack: '#6a6258', brightRed: '#e89488', brightGreen: '#b3d3b9', brightYellow: '#e0bd58',
+    brightBlue: '#a0bcd8', brightMagenta: '#c4a8d4', brightCyan: '#a0cccc', brightWhite: '#e8dfd0',
+  },
+  'paper-white': {
+    background: '#fbfbfa',
+    foreground: '#1a1817',
+    cursor: '#4a4845',
+    cursorAccent: '#fbfbfa',
+    selectionBackground: '#d8d8d4',
+    selectionForeground: '#1a1817',
+    black: '#1a1817', red: '#b8483a', green: '#5a7d60', yellow: '#b88a18',
+    blue: '#456a8e', magenta: '#7a5a8e', cyan: '#48807e', white: '#ebebe8',
+    brightBlack: '#7a7672', brightRed: '#c25c4e', brightGreen: '#6b8f71', brightYellow: '#c49a2a',
+    brightBlue: '#5a7a9e', brightMagenta: '#8b6d9e', brightCyan: '#5a8f8f', brightWhite: '#fbfbfa',
+  },
+  'midnight': {
+    background: '#0d0d0f',
+    foreground: '#cfd0d6',
+    cursor: '#9a9ba2',
+    cursorAccent: '#0d0d0f',
+    selectionBackground: '#33333a',
+    selectionForeground: '#cfd0d6',
+    black: '#0d0d0f', red: '#c47878', green: '#88b890', yellow: '#c4a040',
+    blue: '#88a8b8', magenta: '#a890b8', cyan: '#80b0b0', white: '#a8a9ae',
+    brightBlack: '#55565c', brightRed: '#d49090', brightGreen: '#a0c8a8', brightYellow: '#d8b858',
+    brightBlue: '#a0bcc8', brightMagenta: '#bca8c8', brightCyan: '#98c4c4', brightWhite: '#cfd0d6',
+  },
 };
+
+const KNOWN_THEMES = ['warm-beige', 'dark-mocha', 'paper-white', 'midnight'];
+
+// 纯函数:由 (用户偏好, 系统是否 dark) 解析实际生效主题。
+// 同源逻辑见 lib/theme-resolve.js (有 node test 覆盖)。
+function resolveTheme(preference, systemDark) {
+  if (preference === 'auto') return systemDark ? 'dark-mocha' : 'warm-beige';
+  if (KNOWN_THEMES.indexOf(preference) >= 0) return preference;
+  return 'warm-beige';
+}
+
+function getSystemDark() {
+  return typeof window !== 'undefined'
+    && window.matchMedia
+    && window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
 
 // ===== WebSocket =====
 function createWS() {
@@ -211,10 +346,48 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [contextMenu, setContextMenu] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [themePref, setThemePref] = useState(() => {
+    try { return localStorage.getItem('hub-theme') || 'auto'; } catch { return 'auto'; }
+  });
+  const [systemDark, setSystemDark] = useState(() => getSystemDark());
+  const [termSearchOpen, setTermSearchOpen] = useState(false);
   const { toasts, addToast, removeToast } = useToasts();
   const terminalsRef = useRef({});
   const tabBarRef = useRef(null);
   const prevStatusRef = useRef({});
+
+  // ===== Theme application =====
+  // 实际生效主题 = resolveTheme(用户偏好, 系统dark)。同时应用到:
+  //   1. document.documentElement[data-theme]  (CSS 变量切换)
+  //   2. 所有 active xterm.options.theme        (终端配色切换)
+  const activeTheme = useMemo(() => resolveTheme(themePref, systemDark), [themePref, systemDark]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', activeTheme);
+    Object.values(terminalsRef.current).forEach(entry => {
+      if (entry && entry.term) {
+        try { entry.term.options.theme = THEMES[activeTheme]; } catch (e) {}
+      }
+    });
+  }, [activeTheme]);
+
+  // 监听系统 dark mode 变化(只在 themePref=auto 时影响生效主题)
+  useEffect(() => {
+    if (!window.matchMedia) return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e) => setSystemDark(e.matches);
+    if (mq.addEventListener) mq.addEventListener('change', handler);
+    else mq.addListener(handler);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', handler);
+      else mq.removeListener(handler);
+    };
+  }, []);
+
+  const setTheme = useCallback((pref) => {
+    setThemePref(pref);
+    try { localStorage.setItem('hub-theme', pref); } catch (e) {}
+  }, []);
 
   // Load sessions
   useEffect(() => {
@@ -298,6 +471,20 @@ function App() {
         else if (result === 'alt-buffer') addToast('Cannot highlight in TUI apps (vim/less/etc.)', 'info', 2500);
         else if (result === 'failed') addToast('Highlight failed — try again', 'info', 2000);
         else addToast('Drag to select text first, then ⌘⇧L', 'info', 2500);
+      } else if (mod && (e.key === 'f' || e.key === 'F') && !e.shiftKey && !e.altKey) {
+        // ⌘F: toggle terminal search bar
+        e.preventDefault();
+        e.stopPropagation();
+        if (!activeId) { addToast('No active session', 'info', 1500); return; }
+        setTermSearchOpen(v => !v);
+      } else if (mod && e.shiftKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        // ⌘⇧↑ / ⌘⇧↓: jump to prev/next prompt (OSC 133 marks)
+        // Shift required to avoid macOS ⌘↑ (scroll-to-top) collision.
+        if (!activeId) return;
+        const entry = terminalsRef.current[activeId];
+        if (!entry || !entry.term) return;
+        e.preventDefault();
+        jumpPrompt(entry, e.key === 'ArrowUp' ? -1 : 1, addToast);
       }
     };
     // Capture phase so we beat any terminal/TUI handlers
@@ -312,6 +499,9 @@ function App() {
     window.addEventListener('click', handler);
     return () => window.removeEventListener('click', handler);
   }, [contextMenu]);
+
+  // 切 tab 时自动关闭搜索框
+  useEffect(() => { setTermSearchOpen(false); }, [activeId]);
 
   const switchTab = useCallback((dir) => {
     setSessions(prev => {
@@ -435,23 +625,73 @@ function App() {
   }, []);
 
   function doAttach(sessionId, container) {
+    // 现场解析主题(避开 useCallback([]) 闭包锁住旧 activeTheme 的问题)
+    let pref = 'auto';
+    try { pref = localStorage.getItem('hub-theme') || 'auto'; } catch {}
+    const initialTheme = resolveTheme(pref, getSystemDark());
+
     const term = new Terminal({
       cursorBlink: true,
       fontSize: 15,
       fontFamily: "'Menlo', 'SF Mono', 'Monaco', 'Courier New', monospace",
       fontWeight: '500',
       fontWeightBold: 'bold',
-      theme: termTheme,
+      theme: THEMES[initialTheme] || THEMES['warm-beige'],
       allowTransparency: false,
       scrollback: 3000,
       convertEol: true,
       allowProposedApi: true,  // needed for registerMarker / registerDecoration (highlights)
     });
 
+    // WebGL renderer 必须先于其他 addon,确保它是底层 renderer。
+    // 失败静默降级到默认 DOM renderer(已经是默认),不报错给用户。
+    let webglAddon = null;
+    try {
+      if (typeof WebglAddon !== 'undefined' && WebglAddon.WebglAddon) {
+        webglAddon = new WebglAddon.WebglAddon();
+        webglAddon.onContextLoss(() => { try { webglAddon.dispose(); } catch {} });
+        term.loadAddon(webglAddon);
+      }
+    } catch (e) {
+      console.warn('WebGL renderer unavailable, falling back to DOM:', e);
+      webglAddon = null;
+    }
+
     const fitAddon = new FitAddon.FitAddon();
     const webLinksAddon = new WebLinksAddon.WebLinksAddon();
     term.loadAddon(fitAddon);
     term.loadAddon(webLinksAddon);
+
+    // SearchAddon (⌘F)
+    let searchAddon = null;
+    try {
+      if (typeof SearchAddon !== 'undefined' && SearchAddon.SearchAddon) {
+        searchAddon = new SearchAddon.SearchAddon();
+        term.loadAddon(searchAddon);
+      }
+    } catch (e) { console.warn('SearchAddon unavailable:', e); }
+
+    // Unicode 11 (emoji / 宽字符宽度修正)
+    try {
+      if (typeof Unicode11Addon !== 'undefined' && Unicode11Addon.Unicode11Addon) {
+        const unicode11 = new Unicode11Addon.Unicode11Addon();
+        term.loadAddon(unicode11);
+        term.unicode.activeVersion = '11';
+      }
+    } catch (e) { console.warn('Unicode11Addon unavailable:', e); }
+
+    // OSC 133 prompt 标记 (shell 集成发送 ESC]133;A/B/C/D ST)
+    try {
+      term.parser.registerOscHandler(133, (data) => {
+        // data 形如 "A" / "B" / "C" / "D;<exit_code>"
+        const parts = data.split(';');
+        const type = parts[0];
+        const exitCode = type === 'D' && parts.length > 1 ? parseInt(parts[1], 10) : null;
+        const entry = terminalsRef.current[sessionId];
+        if (entry) recordPromptMark(entry, type, exitCode);
+        return false; // false = 让其他 handler 也能看到
+      });
+    } catch (e) { console.warn('OSC 133 handler registration failed:', e); }
 
     const ws = createWS();
     let reconnectTimer = null;
@@ -486,6 +726,10 @@ function App() {
         }
       } else if (msg.type === 'error') {
         addToast(msg.message, 'error');
+      } else if (msg.type === 'cwd') {
+        setSessions(prev => prev.map(s =>
+          s.id === msg.sessionId ? { ...s, cwd: msg.cwd } : s
+        ));
       }
     };
 
@@ -511,7 +755,12 @@ function App() {
       }
     });
 
-    terminalsRef.current[sessionId] = { term, ws, fitAddon, resizeObserver: null, highlights: [] };
+    terminalsRef.current[sessionId] = {
+      term, ws, fitAddon, searchAddon, webglAddon,
+      resizeObserver: null,
+      highlights: [],
+      promptMarks: [],
+    };
     // Debug hatch — lets DevTools reach terminals without React internals
     if (typeof window !== 'undefined') window.__hubTerms = terminalsRef.current;
 
@@ -570,6 +819,14 @@ function App() {
     if (terminalsRef.current[id]) {
       const t = terminalsRef.current[id];
       if (t.resizeObserver) try { t.resizeObserver.disconnect(); } catch (e) {}
+      if (t.promptMarks) {
+        t.promptMarks.forEach(m => {
+          try { m.decoration && m.decoration.dispose(); } catch {}
+          try { m.marker && m.marker.dispose(); } catch {}
+        });
+      }
+      if (t.searchAddon) try { t.searchAddon.dispose(); } catch (e) {}
+      if (t.webglAddon) try { t.webglAddon.dispose(); } catch (e) {}
       if (t.ws) try { t.ws.close(); } catch (e) {}
       if (t.term) try { t.term.dispose(); } catch (e) {}
       delete terminalsRef.current[id];
@@ -737,6 +994,8 @@ function App() {
           onSearchChange=${setSearchQuery}
           stats=${stats}
           onContextMenu=${handleContextMenu}
+          themePref=${themePref}
+          onThemeChange=${setTheme}
         />
         <div class="terminal-area" onDragOver=${handleDragOver} onDrop=${handleDrop}>
           ${sessions.length === 0 ? html`
@@ -753,6 +1012,13 @@ function App() {
               class=${'terminal-container' + (s.id !== activeId ? ' hidden' : '')}
             />
           `)}
+          ${activeId && sessions.length > 0 && termSearchOpen && terminalsRef.current[activeId] && html`
+            <${TermSearchBar}
+              entry=${terminalsRef.current[activeId]}
+              onClose=${() => { setTermSearchOpen(false); const e = terminalsRef.current[activeId]; if (e && e.searchAddon) try { e.searchAddon.clearDecorations(); } catch {} if (e && e.term) e.term.focus(); }}
+              addToast=${addToast}
+            />
+          `}
           ${activeId && sessions.length > 0 && showScrollBtn && html`
             <button
               class="scroll-bottom-btn"
@@ -905,7 +1171,7 @@ function TabBar({ sessions, activeId, onSelect, onClose, onNew, onRename, onReor
 }
 
 // ===== Sidebar =====
-function Sidebar({ sessions, activeId, open, width, onToggle, onResize, onSelect, onClose, onReorder, searchQuery, onSearchChange, stats, onContextMenu }) {
+function Sidebar({ sessions, activeId, open, width, onToggle, onResize, onSelect, onClose, onReorder, searchQuery, onSearchChange, stats, onContextMenu, themePref, onThemeChange }) {
   const [dragOverId, setDragOverId] = useState(null);
   const dragIdRef = useRef(null);
 
@@ -993,6 +1259,7 @@ function Sidebar({ sessions, activeId, open, width, onToggle, onResize, onSelect
           </div>
         `}
       </div>
+      ${open && html`<${ThemeSwitcher} themePref=${themePref} onChange=${onThemeChange} />`}
       ${open && html`<div class="sidebar-resize-handle" onMouseDown=${handleResizeStart} />`}
     </div>
     ${!open && html`
@@ -1361,6 +1628,94 @@ function NewSessionDialog({ recentDirs, onCreate, onCancel }) {
           <button class="btn btn-secondary" onClick=${onCancel}>Cancel</button>
           <button class="btn btn-primary" onClick=${handleCreate}>Create Session</button>
         </div>
+      </div>
+    </div>
+  `;
+}
+
+// ===== Terminal Search Bar (⌘F) =====
+function TermSearchBar({ entry, onClose, addToast }) {
+  const [query, setQuery] = useState('');
+  const [count, setCount] = useState({ resultIndex: -1, resultCount: 0 });
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    inputRef.current && inputRef.current.focus();
+  }, []);
+
+  // SearchAddon 提供 onDidChangeResults 事件
+  useEffect(() => {
+    if (!entry || !entry.searchAddon || !entry.searchAddon.onDidChangeResults) return;
+    const dispose = entry.searchAddon.onDidChangeResults(e => {
+      setCount({ resultIndex: e.resultIndex, resultCount: e.resultCount });
+    });
+    return () => { try { dispose && dispose.dispose && dispose.dispose(); } catch {} };
+  }, [entry]);
+
+  const search = useCallback((dir) => {
+    if (!entry || !entry.searchAddon || !query) return;
+    const opts = { decorations: {
+      matchBackground: '#FFB347',
+      matchOverviewRuler: '#FFB347',
+      activeMatchBackground: '#FF7F50',
+      activeMatchColorOverviewRuler: '#FF7F50',
+    }};
+    try {
+      if (dir > 0) entry.searchAddon.findNext(query, opts);
+      else entry.searchAddon.findPrevious(query, opts);
+    } catch (e) {
+      addToast && addToast('Search not available in this terminal', 'info', 2000);
+    }
+  }, [entry, query, addToast]);
+
+  const onKeyDown = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); search(e.shiftKey ? -1 : 1); }
+    else if (e.key === 'Escape') { e.preventDefault(); onClose(); }
+  };
+
+  const countText = count.resultCount > 0
+    ? `${count.resultIndex + 1}/${count.resultCount}`
+    : (query ? '0' : '');
+
+  return html`
+    <div class="term-search">
+      <input
+        ref=${inputRef}
+        value=${query}
+        placeholder="Search..."
+        onInput=${e => setQuery(e.target.value)}
+        onKeyDown=${onKeyDown}
+      />
+      <span class="term-search-count">${countText}</span>
+      <button class="term-search-btn" title="Previous (⇧⏎)" onClick=${() => search(-1)} disabled=${!query}>↑</button>
+      <button class="term-search-btn" title="Next (⏎)" onClick=${() => search(1)} disabled=${!query}>↓</button>
+      <button class="term-search-btn" title="Close (Esc)" onClick=${onClose}>✕</button>
+    </div>
+  `;
+}
+
+// ===== Theme Switcher (sidebar 底部小圆点) =====
+function ThemeSwitcher({ themePref, onChange }) {
+  const options = [
+    { name: 'auto', label: 'Auto' },
+    { name: 'warm-beige', label: 'Warm Beige' },
+    { name: 'paper-white', label: 'Paper White' },
+    { name: 'dark-mocha', label: 'Dark Mocha' },
+    { name: 'midnight', label: 'Midnight' },
+  ];
+  return html`
+    <div class="theme-switcher">
+      <span class="theme-switcher-label">Theme</span>
+      <div class="theme-switcher-dots">
+        ${options.map(o => html`
+          <button
+            key=${o.name}
+            class=${'theme-switcher-dot' + (themePref === o.name ? ' active' : '')}
+            data-name=${o.name}
+            title=${o.label}
+            onClick=${() => onChange(o.name)}
+          />
+        `)}
       </div>
     </div>
   `;

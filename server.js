@@ -6,6 +6,11 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { execSync } = require('child_process');
+const { parseOsc7 } = require('./lib/osc-parser');
+
+// Scrollback caps (bytes). When exceeded we slice to LOW to keep recent context.
+const SCROLLBACK_HIGH = 500 * 1024;
+const SCROLLBACK_LOW = 400 * 1024;
 
 // Resolve full path to `claude` binary at startup.
 // node-pty's posix_spawnp may fail if the binary isn't on the
@@ -77,12 +82,23 @@ app.get('/api/sessions', (req, res) => {
 });
 
 app.post('/api/sessions', (req, res) => {
-  const { name, cwd, args } = req.body;
+  const { name, cwd, args, inheritFromSessionId } = req.body;
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+  // Resolve cwd: explicit `cwd` wins; otherwise inherit from a live session's
+  // current cwd (kept fresh by OSC 7); otherwise fall back to the source
+  // session's stored cwd; finally home dir.
+  let resolvedCwd = cwd;
+  if (!resolvedCwd && inheritFromSessionId) {
+    const src = sessions.find(s => s.id === inheritFromSessionId);
+    if (src) resolvedCwd = src.cwd;
+  }
+  if (!resolvedCwd) resolvedCwd = os.homedir();
+
   const session = {
     id,
     name: name || `Session ${sessions.length + 1}`,
-    cwd: cwd || os.homedir(),
+    cwd: resolvedCwd,
     args: args || [],
     createdAt: new Date().toISOString(),
     lastActiveAt: new Date().toISOString(),
@@ -195,6 +211,8 @@ wss.on('connection', (ws) => {
           // Unset CLAUDECODE to avoid nesting issues
           delete env.CLAUDECODE;
           delete env.CLAUDE_CODE;
+          // Mark this PTY so shell-integration scripts only activate inside Hub
+          env.TERM_PROGRAM = 'claude-hub';
 
           const cliArgs = [...(session.args || [])];
 
@@ -237,10 +255,21 @@ wss.on('connection', (ws) => {
           ptyProcess.onData((data) => {
             entry.lastActivity = Date.now();
             entry.status = 'active';
-            // Keep last 50KB of scrollback for re-attach
+            // Keep up to ~500KB of scrollback for re-attach; slice to ~400KB when over.
             entry.scrollback += data;
-            if (entry.scrollback.length > 50000) {
-              entry.scrollback = entry.scrollback.slice(-40000);
+            if (entry.scrollback.length > SCROLLBACK_HIGH) {
+              entry.scrollback = entry.scrollback.slice(-SCROLLBACK_LOW);
+            }
+
+            // OSC 7 cwd tracking — shell tells us where it is.
+            // Update in-memory session object; periodic 30s saveSessions persists it.
+            const newCwd = parseOsc7(data);
+            if (newCwd && newCwd !== session.cwd) {
+              session.cwd = newCwd;
+              const cwdMsg = JSON.stringify({ type: 'cwd', sessionId: id, cwd: newCwd });
+              entry.wsClients.forEach(c => {
+                if (c.readyState === 1) c.send(cwdMsg);
+              });
             }
 
             // Broadcast to all attached clients

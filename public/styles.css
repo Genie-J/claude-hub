@@ -4,7 +4,24 @@
   box-sizing: border-box;
 }
 
+/* ===== Theme System =====
+   语义角色不变,只换色值。所有组件用 var(--xxx) 自动跟随。
+   默认主题(无 data-theme 属性时) = warm-beige。 */
+
 :root {
+  /* Geometry / motion tokens 全主题共用 */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.02), 0 2px 4px rgba(0,0,0,0.03);
+  --shadow-md: 0 1px 3px rgba(0,0,0,0.01), 0 3px 7px rgba(0,0,0,0.02), 0 7px 15px rgba(0,0,0,0.03);
+  --shadow-lg: 0 1px 3px rgba(0,0,0,0.01), 0 3px 7px rgba(0,0,0,0.02), 0 7px 15px rgba(0,0,0,0.02), 0 14px 28px rgba(0,0,0,0.04), 0 23px 52px rgba(0,0,0,0.05);
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --transition: 0.15s ease;
+}
+
+/* warm-beige (默认 / 当前 Hub 配色) */
+:root,
+:root[data-theme="warm-beige"] {
   --bg-primary: #f5f3ed;
   --bg-secondary: #eceae3;
   --bg-tertiary: #e3e0d8;
@@ -23,13 +40,88 @@
   --yellow: #c49a2a;
   --red: #c25d4e;
   --surface: #e7e4dc;
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.02), 0 2px 4px rgba(0,0,0,0.03);
-  --shadow-md: 0 1px 3px rgba(0,0,0,0.01), 0 3px 7px rgba(0,0,0,0.02), 0 7px 15px rgba(0,0,0,0.03);
-  --shadow-lg: 0 1px 3px rgba(0,0,0,0.01), 0 3px 7px rgba(0,0,0,0.02), 0 7px 15px rgba(0,0,0,0.02), 0 14px 28px rgba(0,0,0,0.04), 0 23px 52px rgba(0,0,0,0.05);
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --transition: 0.15s ease;
+  --toast-success-bg: #f0f7f1;
+  --toast-error-bg: #fdf4f3;
+  --toast-attention-bg: #fdf8ed;
+  --highlight-bg: #FFF797;
+}
+
+/* dark-mocha (深棕反色,保留 warm 气质) */
+:root[data-theme="dark-mocha"] {
+  --bg-primary: #2a2622;
+  --bg-secondary: #211e1a;
+  --bg-tertiary: #1a1714;
+  --bg-tab: #2f2a26;
+  --bg-tab-active: #2a2622;
+  --bg-tab-hover: #3a3530;
+  --border: rgba(232,223,208,0.12);
+  --border-light: rgba(232,223,208,0.06);
+  --text-primary: #e8dfd0;
+  --text-secondary: #b8ad9b;
+  --text-muted: #807668;
+  --accent: #9ec0a4;
+  --accent-hover: #b3d3b9;
+  --accent-light: rgba(158,192,164,0.16);
+  --green: #9ec0a4;
+  --yellow: #d4a93a;
+  --red: #d68070;
+  --surface: #36312c;
+  --toast-success-bg: #2c3a2f;
+  --toast-error-bg: #3a2e2c;
+  --toast-attention-bg: #3a352a;
+  --highlight-bg: #d4b85a;
+}
+
+/* paper-white (高对比白底,强光环境用) */
+:root[data-theme="paper-white"] {
+  --bg-primary: #fbfbfa;
+  --bg-secondary: #f3f3f1;
+  --bg-tertiary: #ebebe8;
+  --bg-tab: #eeeeec;
+  --bg-tab-active: #fbfbfa;
+  --bg-tab-hover: #e2e2df;
+  --border: rgba(26,24,23,0.14);
+  --border-light: rgba(26,24,23,0.07);
+  --text-primary: #1a1817;
+  --text-secondary: #4a4845;
+  --text-muted: #7a7672;
+  --accent: #6b8f71;
+  --accent-hover: #547259;
+  --accent-light: rgba(107,143,113,0.14);
+  --green: #6b8f71;
+  --yellow: #b88a18;
+  --red: #b8483a;
+  --surface: #efefec;
+  --toast-success-bg: #eef6ef;
+  --toast-error-bg: #fbf0ef;
+  --toast-attention-bg: #fbf6e8;
+  --highlight-bg: #FFF797;
+}
+
+/* midnight (真深色,夜间编程) */
+:root[data-theme="midnight"] {
+  --bg-primary: #0d0d0f;
+  --bg-secondary: #131316;
+  --bg-tertiary: #1a1a1e;
+  --bg-tab: #18181c;
+  --bg-tab-active: #0d0d0f;
+  --bg-tab-hover: #232328;
+  --border: rgba(207,208,214,0.10);
+  --border-light: rgba(207,208,214,0.05);
+  --text-primary: #cfd0d6;
+  --text-secondary: #9a9ba2;
+  --text-muted: #65666c;
+  --accent: #88a8b8;
+  --accent-hover: #a0bcc9;
+  --accent-light: rgba(136,168,184,0.16);
+  --green: #88b890;
+  --yellow: #c4a040;
+  --red: #c47878;
+  --surface: #1f1f23;
+  --toast-success-bg: #1a2a1e;
+  --toast-error-bg: #2a1c1c;
+  --toast-attention-bg: #2a241a;
+  --highlight-bg: #c4a040;
 }
 
 html, body, #root {
@@ -1198,19 +1290,19 @@ html, body, #root {
 }
 
 .toast.success {
-  background: #f0f7f1;
+  background: var(--toast-success-bg);
   color: var(--green);
   border-color: rgba(107,143,113,0.3);
 }
 
 .toast.error {
-  background: #fdf4f3;
+  background: var(--toast-error-bg);
   color: var(--red);
   border-color: rgba(194,93,78,0.3);
 }
 
 .toast.attention {
-  background: #fdf8ed;
+  background: var(--toast-attention-bg);
   color: var(--yellow);
   border-color: rgba(196,154,42,0.3);
 }
@@ -1248,7 +1340,141 @@ html, body, #root {
 
 /* ===== Terminal Highlights ===== */
 .hub-highlight {
-  background-color: #FFF797 !important;
+  background-color: var(--highlight-bg) !important;
   mix-blend-mode: multiply;
   pointer-events: none;
 }
+
+/* ===== Terminal Search Bar ===== */
+/* xterm SearchAddon 用 decoration 描绘命中,我们补一个浮层搜索框 UI */
+.term-search {
+  position: absolute;
+  top: 8px;
+  right: 16px;
+  z-index: 30;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  animation: slideUp 0.15s ease;
+}
+
+.term-search input {
+  width: 200px;
+  padding: 5px 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--transition);
+}
+
+.term-search input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.term-search-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 0 6px;
+  white-space: nowrap;
+  min-width: 36px;
+  text-align: center;
+}
+
+.term-search-btn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 12px;
+  transition: all var(--transition);
+}
+
+.term-search-btn:hover {
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+.term-search-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.term-search-btn:disabled:hover {
+  background: none;
+  color: var(--text-muted);
+}
+
+/* ===== Failed Command Decoration (OSC 133 D 非 0 exit) ===== */
+.hub-cmd-failed {
+  background-color: var(--red) !important;
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+/* ===== Theme Switcher (sidebar 底部) ===== */
+.theme-switcher {
+  border-top: 1px solid var(--border-light);
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.theme-switcher-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.theme-switcher-dots {
+  display: flex;
+  gap: 5px;
+}
+
+.theme-switcher-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  padding: 0;
+  background: none;
+  position: relative;
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+
+.theme-switcher-dot:hover {
+  transform: scale(1.15);
+}
+
+.theme-switcher-dot.active {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.theme-switcher-dot[data-name="auto"] {
+  background: linear-gradient(135deg, #f5f3ed 50%, #2a2622 50%);
+}
+.theme-switcher-dot[data-name="warm-beige"] { background: #f5f3ed; }
+.theme-switcher-dot[data-name="dark-mocha"] { background: #2a2622; }
+.theme-switcher-dot[data-name="paper-white"] { background: #fbfbfa; }
+.theme-switcher-dot[data-name="midnight"] { background: #0d0d0f; }

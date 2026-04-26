@@ -1,2 +1,3 @@
 node_modules/
 sessions.json
+.DS_Store
