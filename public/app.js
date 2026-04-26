@@ -637,7 +637,7 @@ function App() {
       fontFamily: "'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace",
       fontWeight: '400',
       fontWeightBold: '600',
-      lineHeight: 1.5,
+      lineHeight: 1.2,
       minimumContrastRatio: 4.5,
       theme: THEMES[initialTheme] || THEMES['warm-beige'],
       allowTransparency: false,
