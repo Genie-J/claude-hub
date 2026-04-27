@@ -646,8 +646,19 @@ function App() {
       allowProposedApi: true,  // needed for registerMarker / registerDecoration (highlights)
     });
 
-    // 渲染器:用 xterm 默认 DOM renderer。WebGL addon 与 lineHeight=1.2
-    // (Obsidian DNA) 不兼容,滚动时 glyph atlas 亚像素误差累积导致乱码。
+    // WebGL renderer 必须先于其他 addon,确保它是底层 renderer。
+    // 失败静默降级到默认 DOM renderer(已经是默认),不报错给用户。
+    let webglAddon = null;
+    try {
+      if (typeof WebglAddon !== 'undefined' && WebglAddon.WebglAddon) {
+        webglAddon = new WebglAddon.WebglAddon();
+        webglAddon.onContextLoss(() => { try { webglAddon.dispose(); } catch {} });
+        term.loadAddon(webglAddon);
+      }
+    } catch (e) {
+      console.warn('WebGL renderer unavailable, falling back to DOM:', e);
+      webglAddon = null;
+    }
 
     const fitAddon = new FitAddon.FitAddon();
     const webLinksAddon = new WebLinksAddon.WebLinksAddon();
@@ -748,7 +759,7 @@ function App() {
     });
 
     terminalsRef.current[sessionId] = {
-      term, ws, fitAddon, searchAddon,
+      term, ws, fitAddon, searchAddon, webglAddon,
       resizeObserver: null,
       highlights: [],
       promptMarks: [],
@@ -818,6 +829,7 @@ function App() {
         });
       }
       if (t.searchAddon) try { t.searchAddon.dispose(); } catch (e) {}
+      if (t.webglAddon) try { t.webglAddon.dispose(); } catch (e) {}
       if (t.ws) try { t.ws.close(); } catch (e) {}
       if (t.term) try { t.term.dispose(); } catch (e) {}
       delete terminalsRef.current[id];
