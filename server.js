@@ -94,6 +94,14 @@ app.post('/api/sessions', (req, res) => {
     if (src) resolvedCwd = src.cwd;
   }
   if (!resolvedCwd) resolvedCwd = os.homedir();
+  // cwd must exist AND be readable. brew (and many login-shell rc scripts)
+  // refuse to run when cwd is unreadable, producing cryptic errors.
+  try {
+    fs.accessSync(resolvedCwd, fs.constants.R_OK | fs.constants.X_OK);
+  } catch {
+    console.warn(`cwd "${resolvedCwd}" not readable, falling back to home`);
+    resolvedCwd = os.homedir();
+  }
 
   const session = {
     id,
@@ -202,10 +210,17 @@ wss.on('connection', (ws) => {
         } else {
           // Spawn new pty
           let resolvedCwd = session.cwd || os.homedir();
-          // Validate cwd exists, fallback to home
-          if (!fs.existsSync(resolvedCwd)) {
-            console.warn(`cwd "${resolvedCwd}" does not exist, falling back to home`);
+          // Validate cwd exists AND is readable+executable.
+          // brew/zsh rc scripts fail with "current working directory must be
+          // readable" when cwd points at a dir owned by another user (e.g. an
+          // OSC 7 update after `cd` into a root-owned path).
+          try {
+            fs.accessSync(resolvedCwd, fs.constants.R_OK | fs.constants.X_OK);
+          } catch {
+            console.warn(`cwd "${resolvedCwd}" not accessible, falling back to home`);
             resolvedCwd = os.homedir();
+            session.cwd = resolvedCwd;
+            saveSessions(sessions);
           }
           const env = { ...process.env };
           // Unset CLAUDECODE to avoid nesting issues
