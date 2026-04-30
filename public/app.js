@@ -519,7 +519,13 @@ function App() {
   useEffect(() => {
     const handler = debounce(() => {
       Object.values(terminalsRef.current).forEach(t => {
-        if (t.fitAddon) try { t.fitAddon.fit(); } catch (e) {}
+        if (!t.fitAddon || !t.term) return;
+        try {
+          t.fitAddon.fit();
+          if (t.ws && t.ws.readyState === WebSocket.OPEN) {
+            t.ws.send(JSON.stringify({ type: 'resize', cols: t.term.cols, rows: t.term.rows }));
+          }
+        } catch (e) {}
       });
     }, 100);
     window.addEventListener('resize', handler);
@@ -760,7 +766,12 @@ function App() {
 
     // Use ResizeObserver for reliable fitting
     const debouncedFit = debounce(() => {
-      try { fitAddon.fit(); } catch (e) {}
+      try {
+        fitAddon.fit();
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+        }
+      } catch (e) {}
     }, 50);
 
     const ro = new ResizeObserver(() => debouncedFit());
