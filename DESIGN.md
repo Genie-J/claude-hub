@@ -73,7 +73,7 @@ The accent color is a muted sage green (`#6b8f71`) — calming rather than deman
 
 ### Font Family
 
-- **Primary**: `'PingFang SC', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif` — 中文走 PingFang SC（macOS 系统字体），英文回落 SF Pro
+- **Primary**: `'Charter', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif` — 英文走 Charter（macOS 自带衬线），中文走 PingFang SC；字体栈靠 fallback 顺序自动分流（Charter 无中文字形 → 落到 PingFang SC）
 - **Monospace**: xterm.js default (terminal only)
 - **Font rendering**: `-webkit-font-smoothing: antialiased`
 
