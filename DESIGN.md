@@ -79,12 +79,14 @@ The accent color is a muted sage green (`#6b8f71`) — calming rather than deman
 
 ### Hierarchy
 
+两档字重系统:正文 400 Regular,粗体/强调 500 Medium。Charter 自身偏厚,500 已足够拉出层次,不再用 600/700。
+
 | Role | Size | Weight | Letter Spacing | Use |
 |------|------|--------|---------------|-----|
-| Top Bar Title | 16px | 700 (Bold) | default | App title, navigation anchors |
-| Dialog Title | 16px | 600 (Semibold) | default | Modal headers |
+| Top Bar Title | 16px | 500 (Medium) | default | App title, navigation anchors |
+| Dialog Title | 16px | 500 (Medium) | default | Modal headers |
 | Body / Tab Label | 15px | 500 (Medium) | default | Tab names, sidebar items, main content |
-| Sidebar Section Header | 14px | 600 (Semibold) | 0.8px | Section labels (uppercase) |
+| Sidebar Section Header | 14px | 500 (Medium) | 0.8px | Section labels (uppercase) |
 | Button / Input | 13px | 500 (Medium) | default | Interactive controls, form fields |
 | Sidebar Meta | 13px | 400 (Regular) | default | File paths, timestamps |
 | Dialog Label | 12px | 500 (Medium) | default | Form field labels in dialogs |
@@ -93,8 +95,8 @@ The accent color is a muted sage green (`#6b8f71`) — calming rather than deman
 
 ### Principles
 
-- **System font only** — no custom fonts, no loading delay, instant rendering
-- **Weight carries meaning** — 700 for fixed navigation, 600 for section headers, 500 for interactive elements, 400 for passive content
+- **System font only** — Charter + PingFang SC,均为 macOS 自带,无加载延迟
+- **Weight carries meaning** — 500 用于结构性元素(导航/标题/按钮/section header),400 用于正文与被动内容(meta/toast/hint)
 - **Uppercase + tracking for section headers** — 0.8px letter-spacing on 14px semibold sidebar headers creates structural hierarchy
 - **13px for controls** — buttons and inputs use a deliberately compact size for information density
 

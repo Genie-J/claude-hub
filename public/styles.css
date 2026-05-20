@@ -132,7 +132,12 @@ html, body, #root {
   color: var(--text-primary);
   font-family: 'Charter', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
   font-size: 18px;
+  font-weight: 400;
   -webkit-font-smoothing: antialiased;
+}
+
+b, strong {
+  font-weight: 500;
 }
 
 /* ===== Layout ===== */
@@ -154,7 +159,7 @@ html, body, #root {
 }
 
 .top-bar-title {
-  font-weight: 700;
+  font-weight: 500;
   font-size: 16px;
   color: var(--text-secondary);
   white-space: nowrap;
@@ -421,7 +426,7 @@ html, body, #root {
 
 .sidebar-header {
   padding: 14px 16px 10px;
-  font-weight: 600;
+  font-weight: 500;
   font-size: 14px;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -546,7 +551,7 @@ html, body, #root {
 
 .sidebar-item.active .sidebar-item-name {
   color: var(--accent-hover);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .sidebar-item-meta {
@@ -795,7 +800,7 @@ html, body, #root {
 .file-picker-group-label {
   padding: 6px 12px 2px;
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -903,7 +908,7 @@ html, body, #root {
 
 .dialog-title {
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 500;
   margin-bottom: 24px;
   letter-spacing: -0.5px;
 }
@@ -1324,7 +1329,7 @@ html, body, #root {
 }
 
 .toast-session-name {
-  font-weight: 600;
+  font-weight: 500;
 }
 
 /* ===== Keyboard Hint ===== */
@@ -1442,7 +1447,7 @@ html, body, #root {
 
 .theme-switcher-label {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.6px;
